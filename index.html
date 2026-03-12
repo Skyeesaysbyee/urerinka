@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ずっとヤッツィーしようね！</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="start-screen">
+            <h2 style="color: #ffb7c5;">ずっとヤッツィーしようね！</h2>
+            <p>名前は</p>
+            <input type="text" id="player-name" placeholder="なまえ">
+            <div style="margin-top: 15px; display: flex; justify-content: center; gap: 10px; align-items: center;">
+                <input type="text" id="room-id-input" placeholder="ルームID" style="margin-bottom: 0; width: 50%;">
+                <button onclick="handleLogin()" class="main-btn" style="margin-bottom: 0; padding: 10px 20px;">はい</button>
+            </div>
+        </div>
+
+        <div id="game-screen" style="display: none;">
+            <div class="header-row" style="align-items: center;">
+                <span id="room-display" style="color: #aaa; font-size: 0.8em;"></span>
+                <span id="turn-display" style="color: #ffb7c5; font-weight: bold;"></span>
+                <button onclick="leaveRoom()" style="background: #333; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8em;">リーブ</button>
+            </div>
+            
+            <div id="dice-area">
+                <div class="dice" onclick="toggleHold(0)" id="die-0">一</div>
+                <div class="dice" onclick="toggleHold(1)" id="die-1">一</div>
+                <div class="dice" onclick="toggleHold(2)" id="die-2">一</div>
+                <div class="dice" onclick="toggleHold(3)" id="die-3">一</div>
+                <div class="dice" onclick="toggleHold(4)" id="die-4">一</div>
+            </div>
+
+            <button id="roll-btn" onclick="rollDice()" class="main-btn">ロール</button>
+            <p id="roll-count" style="font-size: 0.8em; margin-top: 5px;">のこり: 3番</p>
+
+            <div id="score-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>しゅるい</th>
+                            <th id="p1-label" style="width: 25%;">P1</th>
+                            <th id="p2-label" style="width: 25%;">P2</th>
+                        </tr>
+                    </thead>
+                    <tbody id="score-body">
+                        <tr onclick="attemptScore('1s', 1)"><td>一</td><td id="s1-1s">ー</td><td id="s2-1s">ー</td></tr>
+                        <tr onclick="attemptScore('2s', 2)"><td>二</td><td id="s1-2s">ー</td><td id="s2-2s">ー</td></tr>
+                        <tr onclick="attemptScore('3s', 3)"><td>三</td><td id="s1-3s">ー</td><td id="s2-3s">ー</td></tr>
+                        <tr onclick="attemptScore('4s', 4)"><td>四</td><td id="s1-4s">ー</td><td id="s2-4s">ー</td></tr>
+                        <tr onclick="attemptScore('5s', 5)"><td>五</td><td id="s1-5s">ー</td><td id="s2-5s">ー</td></tr>
+                        <tr onclick="attemptScore('6s', 6)"><td>六</td><td id="s1-6s">ー</td><td id="s2-6s">ー</td></tr>
+                        <tr class="info-row"><td>ボーナス</td><td id="s1-bonus">0 (63 のこり)</td><td id="s2-bonus">0 (63 のこり)</td></tr>
+                        <tr onclick="attemptScore('3k', '3k')"><td>スリーカード</td><td id="s1-3k">ー</td><td id="s2-3k">ー</td></tr>
+                        <tr onclick="attemptScore('4k', '4k')"><td>フォーカード</td><td id="s1-4k">ー</td><td id="s2-4k">ー</td></tr>
+                        <tr onclick="attemptScore('fh', 'fh')"><td>フルハウス</td><td id="s1-fh">ー</td><td id="s2-fh">ー</td></tr>
+                        <tr onclick="attemptScore('ss', 'ss')"><td>スモールストレート</td><td id="s1-ss">ー</td><td id="s2-ss">ー</td></tr>
+                        <tr onclick="attemptScore('ls', 'ls')"><td>ラージストレート</td><td id="s1-ls">ー</td><td id="s2-ls">ー</td></tr>
+                        <tr onclick="attemptScore('yz', 'yz')"><td>Y A H T Z E E</td><td id="s1-yz">ー</td><td id="s2-yz">ー</td></tr>
+                        <tr onclick="attemptScore('ch', 'ch')"><td>チャンス</td><td id="s1-ch">ー</td><td id="s2-ch">ー</td></tr>
+                        <tr class="total-row"><td>ごうけい</td><td id="s1-total">0</td><td id="s2-total">0</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="leaderboard-area">
+            <h3>ランキング</h3>
+            <ol id="high-scores"></ol>
+        </div>
+
+        <div id="celeb-overlay" onclick="this.style.display='none'">
+            <div class="celeb-content">
+                <h1 style="color: #ffb7c5;">Y A H T Z E E</h1>
+                <p style="color: white; font-size: 1.5em;">すごい！おめでとう！</p>
+            </div>
+        </div>
+
+        <div id="game-over-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; flex-direction: column;">
+            <div class="celeb-content" style="text-align: center;">
+                <h1 id="game-over-title" style="font-size: 2.5em; margin-bottom: 10px;"></h1>
+                <p id="game-over-msg" style="color: white; font-size: 1.2em; margin-bottom: 25px;"></p>
+                <button onclick="requestRematch()" class="main-btn" style="width: 100%; margin-bottom: 15px;">リマッチ</button>
+                <button onclick="leaveRoom()" style="background: #333; color: white; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer; width: 100%;">リーブ</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
