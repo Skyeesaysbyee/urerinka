@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, update, get, remove, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-// Layout fix for table borders
 document.head.insertAdjacentHTML("beforeend", `<style>th:nth-child(2), td:nth-child(2) { border-left: 2px solid #333; }</style>`);
 
 const firebaseConfig = {
@@ -23,7 +22,6 @@ let currentDice = [1, 1, 1, 1, 1]; let heldDice = [false, false, false, false, f
 let playerData = { scores: {}, yahtzeeBonuses: 0 }; let opponentData = { scores: {}, yahtzeeBonuses: 0 };
 const categories = ['1s', '2s', '3s', '4s', '5s', '6s', '3k', '4k', 'fh', 'ss', 'ls', 'yz', 'ch'];
 
-// Load ranks on home screen immediately
 loadHighScores();
 
 window.handleLogin = async function() {
@@ -34,9 +32,17 @@ window.handleLogin = async function() {
     const roomRef = ref(db, `rooms/${currentRoom}`);
     const snapshot = await get(roomRef);
     let empty = {}; categories.forEach(c => empty[c] = 'ー');
+    
     if (!snapshot.exists()) {
-        playerNum = 1; playerData = { name: playerName, scores: empty, yahtzeeBonuses: 0, ready: true };
-        await set(roomRef, { p1: playerData, turn: 1, rollsLeft: 3, dice: [1, 1, 1, 1, 1], held: [false, false, false, false, false] });
+        playerNum = 1; 
+        playerData = { name: playerName, scores: empty, yahtzeeBonuses: 0, ready: true };
+        await set(roomRef, { 
+            p1: playerData, 
+            turn: 1, // Force P1 to go first
+            rollsLeft: 3, 
+            dice: [1, 1, 1, 1, 1], 
+            held: [false, false, false, false, false] 
+        });
     } else {
         const data = snapshot.val();
         playerNum = !data.p2 ? 2 : (!data.p1 ? 1 : null);
@@ -44,6 +50,7 @@ window.handleLogin = async function() {
         playerData = { name: playerName, scores: empty, yahtzeeBonuses: 0, ready: true };
         await update(roomRef, { [`p${playerNum}`]: playerData });
     }
+    
     onDisconnect(ref(db, `rooms/${currentRoom}/p${playerNum}`)).remove();
     document.getElementById("start-screen").style.display = "none";
     document.getElementById("game-screen").style.display = "block";
@@ -136,8 +143,11 @@ function listenToRoom() {
         const data = snap.val(); if (!data) return;
         currentTurn = data.turn; rollsLeft = data.rollsLeft;
         currentDice = data.dice || [1,1,1,1,1]; heldDice = data.held || [false,false,false,false,false];
-        playerData = (playerNum === 1 ? data.p1 : data.p2) || { scores: {}, yahtzeeBonuses: 0 };
-        opponentData = (playerNum === 1 ? data.p2 : data.p1) || { scores: {}, yahtzeeBonuses: 0 };
+        
+        // Safety check to prevent undefined names
+        playerData = (playerNum === 1 ? data.p1 : data.p2) || { name: playerName, scores: {}, yahtzeeBonuses: 0 };
+        opponentData = (playerNum === 1 ? data.p2 : data.p1) || { name: "あいて", scores: {}, yahtzeeBonuses: 0 };
+        
         updateUI(); checkGameOver();
     });
 }
@@ -151,8 +161,10 @@ function updateUI() {
         die.innerText = ['一','二','三','四','五','六'][currentDice[i]-1];
         die.className = heldDice[i] ? "dice held" : "dice";
     }
-    document.getElementById("p1-label").innerText = playerNum === 1 ? playerName : (opponentData.name || "P2");
-    document.getElementById("p2-label").innerText = playerNum === 2 ? playerName : (opponentData.name || "P1");
+
+    // Fix P1/P2 Labels to never show undefined
+    document.getElementById("p1-label").innerText = (playerNum === 1 ? playerName : (opponentData.name || "あいて"));
+    document.getElementById("p2-label").innerText = (playerNum === 2 ? playerName : (opponentData.name || "あいて"));
     
     let totals = [0, 0], uppers = [0, 0];
     let isYz = currentDice.every(v => v === currentDice[0]);
@@ -160,33 +172,39 @@ function updateUI() {
 
     categories.forEach(c => {
         for (let p = 1; p <= 2; p++) {
-            let pD = (p === playerNum) ? playerData : opponentData;
-            let displaySide = (p === playerNum) ? playerNum : (playerNum === 1 ? 2 : 1);
-            let cell = document.getElementById(`s${displaySide}-${c}`);
-            let score = pD.scores[c];
-            if (score !== 'ー') {
-                cell.innerText = (c === 'yz' && pD.yahtzeeBonuses > 0) ? `50+${pD.yahtzeeBonuses*100}` : score;
+            // Get data based on absolute player number (P1 or P2)
+            const roomDataRef = (p === playerNum) ? playerData : opponentData;
+            let cell = document.getElementById(`s${p}-${c}`);
+            let score = (roomDataRef && roomDataRef.scores) ? roomDataRef.scores[c] : 'ー';
+
+            if (score !== undefined && score !== 'ー') {
+                cell.innerText = (c === 'yz' && roomDataRef.yahtzeeBonuses > 0) ? `50+${roomDataRef.yahtzeeBonuses*100}` : score;
                 cell.style.color = "#fff";
                 totals[p-1] += (typeof score === 'number' ? score : 0);
                 if (['1s','2s','3s','4s','5s','6s'].includes(c)) uppers[p-1] += score;
             } else {
                 if (p === playerNum && currentTurn === playerNum && rollsLeft < 3) {
                     cell.innerHTML = `<span style="color:#ffb7c5; opacity:0.6;">${calculateScore(c, currentDice, isBonus)}</span>`;
-                } else { cell.innerText = 'ー'; cell.style.color = "#888"; }
+                } else { 
+                    cell.innerText = 'ー'; 
+                    cell.style.color = "#888"; 
+                }
             }
         }
     });
     
-    let p1Upper = (playerNum === 1) ? uppers[0] : uppers[1];
-    let p2Upper = (playerNum === 2) ? uppers[0] : uppers[1];
-    let b1 = p1Upper >= 63 ? 35 : 0;
-    let b2 = p2Upper >= 63 ? 35 : 0;
+    let b1 = uppers[0] >= 63 ? 35 : 0;
+    let b2 = uppers[1] >= 63 ? 35 : 0;
 
-    document.getElementById(`s1-bonus`).innerText = b1 === 35 ? "35" : `0 (${63 - p1Upper} のこり)`;
-    document.getElementById(`s2-bonus`).innerText = b2 === 35 ? "35" : `0 (${63 - p2Upper} のこり)`;
+    document.getElementById(`s1-bonus`).innerText = b1 === 35 ? "35" : `0 (${63 - uppers[0]} のこり)`;
+    document.getElementById(`s2-bonus`).innerText = b2 === 35 ? "35" : `0 (${63 - uppers[1]} のこり)`;
 
-    let p1Total = (playerNum === 1 ? totals[0] : totals[1]) + b1 + ((playerNum === 1 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) * 100);
-    let p2Total = (playerNum === 2 ? totals[0] : totals[1]) + b2 + ((playerNum === 2 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) * 100);
+    // Calculate totals correctly based on player data
+    let p1BonusCount = playerNum === 1 ? (playerData.yahtzeeBonuses || 0) : (opponentData.yahtzeeBonuses || 0);
+    let p2BonusCount = playerNum === 2 ? (playerData.yahtzeeBonuses || 0) : (opponentData.yahtzeeBonuses || 0);
+
+    let p1Total = totals[0] + b1 + (p1BonusCount * 100);
+    let p2Total = totals[1] + b2 + (p2BonusCount * 100);
 
     document.getElementById(`s1-total`).innerText = p1Total;
     document.getElementById(`s2-total`).innerText = p2Total;
