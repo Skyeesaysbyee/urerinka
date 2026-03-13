@@ -167,7 +167,7 @@ window.attemptScore = async function(category) {
         [`p${playerNum}`]: playerData,
         turn: currentTurn,
         rollsLeft: rollsLeft,
-        dice: currentDice,
+        dice: [1, 1, 1, 1, 1],
         held: heldDice
     });
 
@@ -204,13 +204,14 @@ function calculateScore(category, dice, isJoker) {
     if (category === 'yz') return values.some(v => v === 5) ? 50 : 0;
     if (category === 'fh') return (values.includes(3) && values.includes(2)) || values.includes(5) ? 25 : 0;
     
-    // Straight Logic Fix
-    let uniqueDice = [...new Set(dice)].sort((a, b) => a - b).join('');
+    // Improved Straight Detection
+    let uniqueSorted = [...new Set(dice)].sort((a, b) => a - b).join('');
+    
     if (category === 'ss') {
-        return (uniqueDice.includes('1234') || uniqueDice.includes('2345') || uniqueDice.includes('3456')) ? 30 : 0;
+        return (uniqueSorted.includes('1234') || uniqueSorted.includes('2345') || uniqueSorted.includes('3456')) ? 30 : 0;
     }
     if (category === 'ls') {
-        return (uniqueDice === '12345' || uniqueDice === '23456') ? 40 : 0;
+        return (uniqueSorted === '12345' || uniqueSorted === '23456') ? 40 : 0;
     }
     
     return 0;
@@ -257,7 +258,7 @@ function updateUI() {
     let oppTotal = 0, oppUpper = 0;
 
     let isYahtzee = currentDice.every(v => v === currentDice[0]);
-    let isJoker = isYahtzee && playerData.scores['yz'] >= 50;
+    let isJoker = isYahtzee && (playerData.scores['yz'] >= 50);
 
     categories.forEach(c => {
         let p1Val = playerNum === 1 ? playerData.scores[c] : opponentData.scores[c];
