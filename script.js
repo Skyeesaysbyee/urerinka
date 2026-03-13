@@ -80,17 +80,20 @@ window.toggleHold = async function(i) {
 
 window.attemptScore = async function(category) {
     if (currentTurn !== playerNum || playerData.scores[category] !== 'ー') return;
+    
     let isYz = currentDice.every(v => v === currentDice[0]);
-    let isBonus = (isYz && playerData.scores['yz'] >= 50);
+    let isBonus = (isYz && (playerData.scores['yz'] === 50));
+    
     if (isBonus && playerData.scores[currentDice[0]+'s'] === 'ー' && category !== currentDice[0]+'s') {
         alert("まず数字のボックスを埋めてください！"); return;
     }
+
     let score = calculateScore(category, currentDice, isBonus);
     playerData.scores[category] = score;
-    if (isBonus) playerData.yahtzeeBonuses = (playerData.yahtzeeBonuses || 0) + 1;
-    currentTurn = (playerNum === 1) ? 2 : 1;
     
-    // Reset turn state and dice back to 1,1,1,1,1
+    if (isBonus) playerData.yahtzeeBonuses = (playerData.yahtzeeBonuses || 0) + 1;
+    
+    currentTurn = (playerNum === 1) ? 2 : 1;
     await update(ref(db, `rooms/${currentRoom}`), { 
         [`p${playerNum}`]: playerData, 
         turn: currentTurn, 
@@ -98,7 +101,7 @@ window.attemptScore = async function(category) {
         dice: [1,1,1,1,1], 
         held: [false,false,false,false,false] 
     });
-    
+
     if (score >= 25 && isYz) {
         let msg = playerName === "りんかちゃん" ? "えらいね！" : "すごい！";
         document.getElementById('celeb-overlay').innerHTML = `<div class="celeb-content"><h1 style="color:#ffb7c5;">Y A H T Z E E</h1><p style="color:white;">${msg}</p></div>`;
@@ -111,30 +114,34 @@ function calculateScore(cat, dice, joker) {
     let counts = {}; dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
     let valArr = Object.values(counts);
     let sum = dice.reduce((a, b) => a + b, 0);
+    let has = (n) => dice.includes(n);
+
+    // 1. Check Upper Section
     if (cat.endsWith('s')) return dice.filter(d => d === parseInt(cat[0])).reduce((a, b) => a + b, 0);
+
+    // 2. Check Straights (Check these BEFORE Joker logic to be safe)
+    if (cat === 'ss') {
+        if ((has(1)&&has(2)&&has(3)&&has(4)) || (has(2)&&has(3)&&has(4)&&has(5)) || (has(3)&&has(4)&&has(5)&&has(6))) return 30;
+    }
+    if (cat === 'ls') {
+        if ((has(1)&&has(2)&&has(3)&&has(4)&&has(5)) || (has(2)&&has(3)&&has(4)&&has(5)&&has(6))) return 40;
+    }
+
+    // 3. Joker Rules (If user has a bonus Yahtzee, straights/FH are automatic)
     if (joker) {
-        if (cat === 'fh') return 25; if (cat === 'ss') return 30; if (cat === 'ls') return 40;
+        if (cat === 'fh') return 25; 
+        if (cat === 'ss') return 30; 
+        if (cat === 'ls') return 40;
         if (cat === '3k' || cat === '4k' || cat === 'ch') return sum;
     }
+
+    // 4. Standard Lower Section
     if (cat === '3k') return valArr.some(v => v >= 3) ? sum : 0;
     if (cat === '4k') return valArr.some(v => v >= 4) ? sum : 0;
     if (cat === 'ch') return sum;
     if (cat === 'yz') return valArr.some(v => v === 5) ? 50 : 0;
-    if (cat === 'fh') return (valArr.includes(3) && valArr.includes(2)) || valArr.includes(5) ? 25 : 0;
-    
-    // NEW CHECKLIST STRAIGHT LOGIC
-    let has = (n) => dice.includes(n);
-    if (cat === 'ss') {
-        let s1 = has(1) && has(2) && has(3) && has(4);
-        let s2 = has(2) && has(3) && has(4) && has(5);
-        let s3 = has(3) && has(4) && has(5) && has(6);
-        return (s1 || s2 || s3) ? 30 : 0;
-    }
-    if (cat === 'ls') {
-        let l1 = has(1) && has(2) && has(3) && has(4) && has(5);
-        let l2 = has(2) && has(3) && has(4) && has(5) && has(6);
-        return (l1 || l2) ? 40 : 0;
-    }
+    if (cat === 'fh') return (valArr.includes(3) && valArr.includes(2)) ? 25 : 0;
+
     return 0;
 }
 
@@ -160,7 +167,11 @@ function updateUI() {
     }
     document.getElementById("p1-label").innerText = playerNum === 1 ? playerName : (opponentData.name || "P2");
     document.getElementById("p2-label").innerText = playerNum === 2 ? playerName : (opponentData.name || "P1");
+    
     let totals = [0, 0], uppers = [0, 0];
+    let isYz = currentDice.every(v => v === currentDice[0]);
+    let isBonus = (isYz && playerData.scores['yz'] === 50);
+
     categories.forEach(c => {
         for (let p = 1; p <= 2; p++) {
             let pD = (p === playerNum) ? playerData : opponentData;
@@ -173,16 +184,13 @@ function updateUI() {
                 if (['1s','2s','3s','4s','5s','6s'].includes(c)) uppers[p-1] += score;
             } else {
                 if (p === playerNum && currentTurn === playerNum && rollsLeft < 3) {
-                    let pot = calculateScore(c, currentDice, (currentDice.every(v => v === currentDice[0]) && playerData.scores['yz'] >= 50));
-                    if (['ss','ls'].includes(c)) { 
-                        cell.innerHTML = pot > 0 ? `<span style="color:#ffb7c5; opacity:0.6;">${pot}</span>` : 'ー';
-                    } else {
-                        cell.innerHTML = `<span style="color:#ffb7c5; opacity:0.6;">${pot}</span>`;
-                    }
+                    let pot = calculateScore(c, currentDice, isBonus);
+                    cell.innerHTML = `<span style="color:#ffb7c5; opacity:0.6;">${pot}</span>`;
                 } else { cell.innerText = 'ー'; cell.style.color = "#888"; }
             }
         }
     });
+    
     let myB = uppers[0] >= 63 ? 35 : 0; let oppB = uppers[1] >= 63 ? 35 : 0;
     let myT = totals[0] + myB + (playerData.yahtzeeBonuses * 100);
     let oppT = totals[1] + oppB + (opponentData.yahtzeeBonuses * 100);
