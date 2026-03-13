@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, update, get, remove, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
+// Layout fix for table borders
 document.head.insertAdjacentHTML("beforeend", `<style>th:nth-child(2), td:nth-child(2) { border-left: 2px solid #333; }</style>`);
 
 const firebaseConfig = {
@@ -93,6 +94,7 @@ window.attemptScore = async function(category) {
     if (isBonus) playerData.yahtzeeBonuses = (playerData.yahtzeeBonuses || 0) + 1;
     currentTurn = (playerNum === 1) ? 2 : 1;
     await update(ref(db, `rooms/${currentRoom}`), { [`p${playerNum}`]: playerData, turn: currentTurn, rollsLeft: 3, dice: [1,1,1,1,1], held: [false,false,false,false,false] });
+    
     if (score >= 25 && isYz) {
         let msg = playerName === "りんかちゃん" ? "えらいね！" : "すごい！";
         document.getElementById('celeb-overlay').innerHTML = `<div class="celeb-content"><h1 style="color:#ffb7c5;">Y A H T Z E E</h1><p style="color:white;">${msg}</p></div>`;
@@ -106,6 +108,7 @@ function calculateScore(cat, dice, joker) {
     let valArr = Object.values(counts);
     let sum = dice.reduce((a, b) => a + b, 0);
     let has = (n) => dice.includes(n);
+
     if (cat === 'ss') {
         if (joker) return 30;
         if ((has(1)&&has(2)&&has(3)&&has(4)) || (has(2)&&has(3)&&has(4)&&has(5)) || (has(3)&&has(4)&&has(5)&&has(6))) return 30;
@@ -176,7 +179,6 @@ function updateUI() {
     
     let p1Upper = (playerNum === 1) ? uppers[0] : uppers[1];
     let p2Upper = (playerNum === 2) ? uppers[0] : uppers[1];
-    
     let b1 = p1Upper >= 63 ? 35 : 0;
     let b2 = p2Upper >= 63 ? 35 : 0;
 
@@ -191,7 +193,7 @@ function updateUI() {
 }
 
 function checkGameOver() {
-    if (categories.every(c => playerData.scores[c] !== 'ー' && opponentData.scores[c] !== 'ー')) {
+    if (categories.every(c => playerData.scores[c] !== 'ー' && (opponentData.scores && opponentData.scores[c] !== 'ー'))) {
         let myT = parseInt(document.getElementById(`s${playerNum}-total`).innerText);
         let oppT = parseInt(document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText);
 
@@ -232,4 +234,20 @@ window.requestRematch = async function() {
     document.getElementById("game-over-overlay").style.display = 'none';
     let empty = {}; categories.forEach(c => empty[c] = 'ー');
     await update(ref(db, `rooms/${currentRoom}`), { [`p${playerNum}`]: { name: playerName, scores: empty, yahtzeeBonuses: 0, scoreSaved: false, ready: true }, turn: 1, rollsLeft: 3, dice: [1, 1, 1, 1, 1], held: [false, false, false, false, false] });
+};
+
+// DEBUG TEST FUNCTION
+window.testSave = async function() {
+    const d = new Date();
+    const dateStr = `${d.getMonth()+1}.${d.getDate().toString().padStart(2,'0')}.${d.getFullYear().toString().slice(-2)}`;
+    try {
+        await push(ref(db, 'highscores'), {
+            name: playerName || "w",
+            score: 999,
+            date: dateStr
+        });
+        alert("✅ Firebase Save Worked! Check the leaderboard.");
+    } catch (e) {
+        alert("❌ Save Failed: " + e.message);
+    }
 };
