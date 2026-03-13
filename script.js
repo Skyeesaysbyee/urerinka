@@ -1,6 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, update, get, remove, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
+document.head.insertAdjacentHTML("beforeend", `<style>
+    th:nth-child(2), td:nth-child(2) { border-left: 2px solid #333; }
+</style>`);
+
 const firebaseConfig = {
   apiKey: "AIzaSyDXi3GXU8rM7WyTZhoa4KdLkmD_kkn-X6U",
   authDomain: "urerinka.firebaseapp.com",
@@ -228,30 +232,55 @@ function updateUI() {
     let myTotal = 0, myUpper = 0;
     let oppTotal = 0, oppUpper = 0;
 
+    let isYahtzee = currentDice.every(v => v === currentDice[0]);
+    let isJoker = isYahtzee && playerData.scores['yz'] >= 50;
+
     categories.forEach(c => {
         let p1Val = playerNum === 1 ? playerData.scores[c] : opponentData.scores[c];
+        let p1Cell = document.getElementById(`s1-${c}`);
+        
         if (p1Val !== undefined && p1Val !== 'ー') {
-            document.getElementById(`s1-${c}`).innerText = c === 'yz' && (playerNum === 1 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) > 0 
+            p1Cell.innerText = c === 'yz' && (playerNum === 1 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) > 0 
                 ? `50 + ${(playerNum === 1 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) * 100}` 
                 : p1Val;
+            p1Cell.style.color = "#fff";
             if (playerNum === 1) myTotal += (typeof p1Val === 'number' ? p1Val : 0);
             else oppTotal += (typeof p1Val === 'number' ? p1Val : 0);
             if (['1s','2s','3s','4s','5s','6s'].includes(c)) {
                 if (playerNum === 1) myUpper += p1Val; else oppUpper += p1Val;
             }
-        } else { document.getElementById(`s1-${c}`).innerText = 'ー'; }
+        } else {
+            if (playerNum === 1 && currentTurn === 1 && rollsLeft < 3) {
+                let potScore = calculateScore(c, currentDice, isJoker);
+                p1Cell.innerHTML = `<span style="color: #ffb7c5; opacity: 0.6;">${potScore}</span>`;
+            } else {
+                p1Cell.innerText = 'ー';
+                p1Cell.style.color = "#888";
+            }
+        }
 
         let p2Val = playerNum === 2 ? playerData.scores[c] : opponentData.scores[c];
+        let p2Cell = document.getElementById(`s2-${c}`);
+
         if (p2Val !== undefined && p2Val !== 'ー') {
-            document.getElementById(`s2-${c}`).innerText = c === 'yz' && (playerNum === 2 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) > 0 
+            p2Cell.innerText = c === 'yz' && (playerNum === 2 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) > 0 
                 ? `50 + ${(playerNum === 2 ? playerData.yahtzeeBonuses : opponentData.yahtzeeBonuses) * 100}` 
                 : p2Val;
+            p2Cell.style.color = "#fff";
             if (playerNum === 2) myTotal += (typeof p2Val === 'number' ? p2Val : 0);
             else oppTotal += (typeof p2Val === 'number' ? p2Val : 0);
             if (['1s','2s','3s','4s','5s','6s'].includes(c)) {
                 if (playerNum === 2) myUpper += p2Val; else oppUpper += p2Val;
             }
-        } else { document.getElementById(`s2-${c}`).innerText = 'ー'; }
+        } else {
+            if (playerNum === 2 && currentTurn === 2 && rollsLeft < 3) {
+                let potScore = calculateScore(c, currentDice, isJoker);
+                p2Cell.innerHTML = `<span style="color: #ffb7c5; opacity: 0.6;">${potScore}</span>`;
+            } else {
+                p2Cell.innerText = 'ー';
+                p2Cell.style.color = "#888";
+            }
+        }
     });
 
     let myUpperBonus = myUpper >= 63 ? 35 : 0;
