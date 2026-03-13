@@ -164,6 +164,7 @@ window.attemptScore = async function(category) {
     });
 
     if (score >= 25 && isYahtzee) {
+        document.querySelector('#celeb-overlay p').innerText = (playerName === "りんかちゃん") ? "えらいね！" : "すごい！おめでとう！";
         document.getElementById('celeb-overlay').style.display = 'flex';
         setTimeout(() => document.getElementById('celeb-overlay').style.display = 'none', 3000);
     }
@@ -307,12 +308,23 @@ function checkGameOver() {
     if (myScoresDone && oppScoresDone) {
         let myTotal = parseInt(document.getElementById(`s${playerNum}-total`).innerText);
         let oppTotal = parseInt(document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText);
-        let msg = myTotal > oppTotal ? "あなたの勝ち！" : myTotal < oppTotal ? "あいての勝ち！" : "引き分け！";
+        
+        let msg = "";
+        if (myTotal > oppTotal) {
+            msg = (playerName === "りんかちゃん") ? "大好きだよ" : "かち";
+        } else if (myTotal < oppTotal) {
+            msg = "まけ";
+        } else {
+            msg = "引き分け！";
+        }
+
         document.getElementById("game-over-title").innerText = msg;
         document.getElementById("game-over-msg").innerText = `${myTotal} pt  vs  ${oppTotal} pt`;
         document.getElementById("game-over-overlay").style.display = 'flex';
+        
         const d = new Date();
         const formattedDate = `${d.getMonth() + 1}.${d.getDate().toString().padStart(2, '0')}.${d.getFullYear().toString().slice(-2)}`;
+        
         if (myTotal > 0 && !playerData.scoreSaved) {
             push(ref(db, 'highscores'), { name: playerName, score: myTotal, date: formattedDate });
             playerData.scoreSaved = true;
@@ -328,7 +340,7 @@ function loadHighScores() {
         scores.sort((a, b) => b.score - a.score); 
         const list = document.getElementById("high-scores");
         list.innerHTML = "";
-        scores.slice(0, 5).forEach(score => {
+        scores.slice(0, 15).forEach(score => {
             let li = document.createElement("li");
             li.innerText = `${score.date || '0.00.00'} - ${score.score}pt - ${score.name}`;
             list.appendChild(li);
