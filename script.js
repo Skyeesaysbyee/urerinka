@@ -168,7 +168,7 @@ window.attemptScore = async function(category) {
         turn: currentTurn,
         rollsLeft: rollsLeft,
         dice: [1, 1, 1, 1, 1],
-        held: heldDice
+        held: [false, false, false, false, false]
     });
 
     if (score >= 25 && isYahtzee) {
@@ -204,14 +204,20 @@ function calculateScore(category, dice, isJoker) {
     if (category === 'yz') return values.some(v => v === 5) ? 50 : 0;
     if (category === 'fh') return (values.includes(3) && values.includes(2)) || values.includes(5) ? 25 : 0;
     
-    // Improved Straight Detection
-    let uniqueSorted = [...new Set(dice)].sort((a, b) => a - b).join('');
-    
+    // THE STRAIGHT FIX: Check for the presence of specific numbers
+    let has = (val) => dice.includes(val);
+
     if (category === 'ss') {
-        return (uniqueSorted.includes('1234') || uniqueSorted.includes('2345') || uniqueSorted.includes('3456')) ? 30 : 0;
+        let s1 = has(1) && has(2) && has(3) && has(4);
+        let s2 = has(2) && has(3) && has(4) && has(5);
+        let s3 = has(3) && has(4) && has(5) && has(6);
+        return (s1 || s2 || s3) ? 30 : 0;
     }
+
     if (category === 'ls') {
-        return (uniqueSorted === '12345' || uniqueSorted === '23456') ? 40 : 0;
+        let l1 = has(1) && has(2) && has(3) && has(4) && has(5);
+        let l2 = has(2) && has(3) && has(4) && has(5) && has(6);
+        return (l1 || l2) ? 40 : 0;
     }
     
     return 0;
