@@ -89,7 +89,16 @@ window.attemptScore = async function(category) {
     playerData.scores[category] = score;
     if (isBonus) playerData.yahtzeeBonuses = (playerData.yahtzeeBonuses || 0) + 1;
     currentTurn = (playerNum === 1) ? 2 : 1;
-    await update(ref(db, `rooms/${currentRoom}`), { [`p${playerNum}`]: playerData, turn: currentTurn, rollsLeft: 3, dice: [1,1,1,1,1], held: [false,false,false,false,false] });
+    
+    // Reset turn state and dice back to 1,1,1,1,1
+    await update(ref(db, `rooms/${currentRoom}`), { 
+        [`p${playerNum}`]: playerData, 
+        turn: currentTurn, 
+        rollsLeft: 3, 
+        dice: [1,1,1,1,1], 
+        held: [false,false,false,false,false] 
+    });
+    
     if (score >= 25 && isYz) {
         let msg = playerName === "りんかちゃん" ? "えらいね！" : "すごい！";
         document.getElementById('celeb-overlay').innerHTML = `<div class="celeb-content"><h1 style="color:#ffb7c5;">Y A H T Z E E</h1><p style="color:white;">${msg}</p></div>`;
@@ -112,9 +121,20 @@ function calculateScore(cat, dice, joker) {
     if (cat === 'ch') return sum;
     if (cat === 'yz') return valArr.some(v => v === 5) ? 50 : 0;
     if (cat === 'fh') return (valArr.includes(3) && valArr.includes(2)) || valArr.includes(5) ? 25 : 0;
+    
+    // NEW CHECKLIST STRAIGHT LOGIC
     let has = (n) => dice.includes(n);
-    if (cat === 'ss') return ((has(1)&&has(2)&&has(3)&&has(4))||(has(2)&&has(3)&&has(4)&&has(5))||(has(3)&&has(4)&&has(5)&&has(6))) ? 30 : 0;
-    if (cat === 'ls') return ((has(1)&&has(2)&&has(3)&&has(4)&&has(5))||(has(2)&&has(3)&&has(4)&&has(5)&&has(6))) ? 40 : 0;
+    if (cat === 'ss') {
+        let s1 = has(1) && has(2) && has(3) && has(4);
+        let s2 = has(2) && has(3) && has(4) && has(5);
+        let s3 = has(3) && has(4) && has(5) && has(6);
+        return (s1 || s2 || s3) ? 30 : 0;
+    }
+    if (cat === 'ls') {
+        let l1 = has(1) && has(2) && has(3) && has(4) && has(5);
+        let l2 = has(2) && has(3) && has(4) && has(5) && has(6);
+        return (l1 || l2) ? 40 : 0;
+    }
     return 0;
 }
 
