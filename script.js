@@ -114,33 +114,31 @@ function calculateScore(cat, dice, joker) {
     let counts = {}; dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
     let valArr = Object.values(counts);
     let sum = dice.reduce((a, b) => a + b, 0);
+    
+    // Checklist for Straights
     let has = (n) => dice.includes(n);
 
-    // 1. Check Upper Section
-    if (cat.endsWith('s')) return dice.filter(d => d === parseInt(cat[0])).reduce((a, b) => a + b, 0);
-
-    // 2. Check Straights (Check these BEFORE Joker logic to be safe)
     if (cat === 'ss') {
+        if (joker) return 30;
         if ((has(1)&&has(2)&&has(3)&&has(4)) || (has(2)&&has(3)&&has(4)&&has(5)) || (has(3)&&has(4)&&has(5)&&has(6))) return 30;
+        return 0;
     }
     if (cat === 'ls') {
+        if (joker) return 40;
         if ((has(1)&&has(2)&&has(3)&&has(4)&&has(5)) || (has(2)&&has(3)&&has(4)&&has(5)&&has(6))) return 40;
+        return 0;
     }
-
-    // 3. Joker Rules (If user has a bonus Yahtzee, straights/FH are automatic)
-    if (joker) {
-        if (cat === 'fh') return 25; 
-        if (cat === 'ss') return 30; 
-        if (cat === 'ls') return 40;
-        if (cat === '3k' || cat === '4k' || cat === 'ch') return sum;
+    if (cat === 'fh') {
+        if (joker) return 25;
+        return (valArr.includes(3) && valArr.includes(2)) ? 25 : 0;
     }
-
-    // 4. Standard Lower Section
+    if (cat.endsWith('s')) {
+        return dice.filter(d => d === parseInt(cat[0])).reduce((a, b) => a + b, 0);
+    }
     if (cat === '3k') return valArr.some(v => v >= 3) ? sum : 0;
     if (cat === '4k') return valArr.some(v => v >= 4) ? sum : 0;
     if (cat === 'ch') return sum;
     if (cat === 'yz') return valArr.some(v => v === 5) ? 50 : 0;
-    if (cat === 'fh') return (valArr.includes(3) && valArr.includes(2)) ? 25 : 0;
 
     return 0;
 }
@@ -169,22 +167,25 @@ function updateUI() {
     document.getElementById("p2-label").innerText = playerNum === 2 ? playerName : (opponentData.name || "P1");
     
     let totals = [0, 0], uppers = [0, 0];
-    let isYz = currentDice.every(v => v === currentDice[0]);
-    let isBonus = (isYz && playerData.scores['yz'] === 50);
+    let currentIsYz = currentDice.every(v => v === currentDice[0]);
+    let currentIsBonus = (currentIsYz && (playerData.scores['yz'] === 50));
 
     categories.forEach(c => {
         for (let p = 1; p <= 2; p++) {
             let pD = (p === playerNum) ? playerData : opponentData;
-            let cell = document.getElementById(`s${p === playerNum ? playerNum : (playerNum === 1 ? 2 : 1)}-${c}`);
+            let displayIndex = (p === playerNum) ? playerNum : (playerNum === 1 ? 2 : 1);
+            let cell = document.getElementById(`s${displayIndex}-${c}`);
             let score = pD.scores[c];
+            
             if (score !== 'ー') {
-                cell.innerText = (c === 'yz' && pD.yahtzeeBonuses > 0) ? `50+${pD.yahtzeeBonuses*100}` : score;
+                if (c === 'yz' && pD.yahtzeeBonuses > 0) cell.innerText = `50+${pD.yahtzeeBonuses*100}`;
+                else cell.innerText = score;
                 cell.style.color = "#fff";
                 totals[p-1] += (typeof score === 'number' ? score : 0);
                 if (['1s','2s','3s','4s','5s','6s'].includes(c)) uppers[p-1] += score;
             } else {
                 if (p === playerNum && currentTurn === playerNum && rollsLeft < 3) {
-                    let pot = calculateScore(c, currentDice, isBonus);
+                    let pot = calculateScore(c, currentDice, currentIsBonus);
                     cell.innerHTML = `<span style="color:#ffb7c5; opacity:0.6;">${pot}</span>`;
                 } else { cell.innerText = 'ー'; cell.style.color = "#888"; }
             }
