@@ -161,7 +161,7 @@ window.attemptScore = async function(category) {
     currentTurn = (playerNum === 1) ? 2 : 1;
     rollsLeft = 3;
     heldDice = [false, false, false, false, false];
-    currentDice = [1, 1, 1, 1, 1]; // Reset dice for next turn
+    currentDice = [1, 1, 1, 1, 1]; 
 
     await update(ref(db, `rooms/${currentRoom}`), {
         [`p${playerNum}`]: playerData,
