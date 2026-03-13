@@ -174,7 +174,6 @@ function updateUI() {
         }
     });
     
-    // Correct side mapping for bonus points
     let p1Upper = (playerNum === 1) ? uppers[0] : uppers[1];
     let p2Upper = (playerNum === 2) ? uppers[0] : uppers[1];
     
@@ -193,10 +192,8 @@ function updateUI() {
 
 function checkGameOver() {
     if (categories.every(c => playerData.scores[c] !== 'ー' && opponentData.scores[c] !== 'ー')) {
-        let mySideTotal = document.getElementById(`s${playerNum}-total`).innerText;
-        let myT = parseInt(mySideTotal);
-        let oppSideTotal = document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText;
-        let oppT = parseInt(oppSideTotal);
+        let myT = parseInt(document.getElementById(`s${playerNum}-total`).innerText);
+        let oppT = parseInt(document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText);
 
         let msg = myT > oppT ? (playerName === "りんかちゃん" ? "大好きだよ" : "かち") : (myT < oppT ? "まけ" : "引き分け！");
         document.getElementById("game-over-title").innerText = msg;
@@ -206,9 +203,11 @@ function checkGameOver() {
         if (myT > 0 && !playerData.scoreSaved) {
             const d = new Date();
             const dateStr = `${d.getMonth()+1}.${d.getDate().toString().padStart(2,'0')}.${d.getFullYear().toString().slice(-2)}`;
-            push(ref(db, 'highscores'), { name: playerName, score: myT, date: dateStr });
-            playerData.scoreSaved = true;
-            update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scoreSaved: true });
+            
+            push(ref(db, 'highscores'), { name: playerName, score: myT, date: dateStr }).then(() => {
+                playerData.scoreSaved = true;
+                update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scoreSaved: true });
+            });
         }
     }
 }
