@@ -235,19 +235,3 @@ window.requestRematch = async function() {
     let empty = {}; categories.forEach(c => empty[c] = 'ー');
     await update(ref(db, `rooms/${currentRoom}`), { [`p${playerNum}`]: { name: playerName, scores: empty, yahtzeeBonuses: 0, scoreSaved: false, ready: true }, turn: 1, rollsLeft: 3, dice: [1, 1, 1, 1, 1], held: [false, false, false, false, false] });
 };
-
-// DEBUG TEST FUNCTION
-window.testSave = async function() {
-    const d = new Date();
-    const dateStr = `${d.getMonth()+1}.${d.getDate().toString().padStart(2,'0')}.${d.getFullYear().toString().slice(-2)}`;
-    try {
-        await push(ref(db, 'highscores'), {
-            name: playerName || "w",
-            score: 999,
-            date: dateStr
-        });
-        alert("✅ Firebase Save Worked! Check the leaderboard.");
-    } catch (e) {
-        alert("❌ Save Failed: " + e.message);
-    }
-};
