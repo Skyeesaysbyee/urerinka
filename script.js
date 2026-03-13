@@ -22,8 +22,8 @@ let rollsLeft = 3;
 let currentDice = [1, 1, 1, 1, 1];
 let heldDice = [false, false, false, false, false];
 
-let playerData = { scores: {} };
-let opponentData = { scores: {} };
+let playerData = { scores: {}, yahtzeeBonuses: 0 };
+let opponentData = { scores: {}, yahtzeeBonuses: 0 };
 
 const categories = ['1s', '2s', '3s', '4s', '5s', '6s', '3k', '4k', 'fh', 'ss', 'ls', 'yz', 'ch'];
 
@@ -49,7 +49,7 @@ window.handleLogin = async function() {
 
     if (!snapshot.exists()) {
         playerNum = 1;
-        playerData = { name: playerName, scores: emptyScores, ready: true };
+        playerData = { name: playerName, scores: emptyScores, yahtzeeBonuses: 0, ready: true };
         await set(roomRef, {
             p1: playerData,
             turn: 1,
@@ -61,11 +61,11 @@ window.handleLogin = async function() {
         const data = snapshot.val();
         if (!data.p2) {
             playerNum = 2;
-            playerData = { name: playerName, scores: emptyScores, ready: true };
+            playerData = { name: playerName, scores: emptyScores, yahtzeeBonuses: 0, ready: true };
             await update(roomRef, { p2: playerData });
         } else if (!data.p1) {
             playerNum = 1;
-            playerData = { name: playerName, scores: emptyScores, ready: true };
+            playerData = { name: playerName, scores: emptyScores, yahtzeeBonuses: 0, ready: true };
             await update(roomRef, { p1: playerData });
         } else {
             alert("このルームは満員です！");
@@ -89,6 +89,15 @@ window.leaveRoom = async function() {
         const roomRef = ref(db, `rooms/${currentRoom}`);
         if (playerNum === 1) await update(roomRef, { p1: null });
         if (playerNum === 2) await update(roomRef, { p2: null });
+        
+        // Auto-delete empty rooms
+        const snap = await get(roomRef);
+        if (snap.exists()) {
+            const data = snap.val();
+            if (!data.p1 && !data.p2) {
+                await remove(roomRef);
+            }
+        }
     }
     location.reload(); 
 };
@@ -96,9 +105,22 @@ window.leaveRoom = async function() {
 window.rollDice = async function() {
     if (currentTurn !== playerNum || rollsLeft <= 0) return;
 
+    let targetNum = null;
+    for (let i = 0; i < 5; i++) {
+        if (heldDice[i]) {
+            targetNum = currentDice[i];
+            break; 
+        }
+    }
+
     for (let i = 0; i < 5; i++) {
         if (!heldDice[i]) {
-            currentDice[i] = Math.floor(Math.random() * 6) + 1;
+            let roll = Math.floor(Math.random() * 6) + 1;
+            // Lucky RNG: 10% chance to duplicate a held die
+            if (targetNum !== null && Math.random() < 0.10) {
+                roll = targetNum;
+            }
+            currentDice[i] = roll;
         }
     }
 
@@ -116,8 +138,28 @@ window.attemptScore = async function(category) {
     if (currentTurn !== playerNum) return;
     if (playerData.scores[category] !== 'ー') return;
 
-    let score = calculateScore(category, currentDice);
+    let isYahtzee = currentDice.every(v => v === currentDice[0]);
+    let targetNum = currentDice[0];
+    let upperCategory = targetNum + 's';
+    let isYahtzeeBonus = false;
+    let isJoker = false;
+
+    // Check Yahtzee Joker Rules
+    if (isYahtzee && playerData.scores['yz'] >= 50) {
+        isYahtzeeBonus = true;
+        isJoker = true;
+        if (playerData.scores[upperCategory] === 'ー' && category !== upperCategory) {
+            alert(`ボーナスルール: まず ${targetNum} のボックスを埋めてください！\n(You must score this in the ${targetNum}s box first!)`);
+            return;
+        }
+    }
+
+    let score = calculateScore(category, currentDice, isJoker);
     playerData.scores[category] = score;
+
+    if (isYahtzeeBonus) {
+        playerData.yahtzeeBonuses = (playerData.yahtzeeBonuses || 0) + 1;
+    }
 
     currentTurn = (playerNum === 1) ? 2 : 1;
     rollsLeft = 3;
@@ -131,14 +173,16 @@ window.attemptScore = async function(category) {
         held: heldDice
     });
 
-    let isYahtzee = currentDice.every(v => v === currentDice[0]);
     if (score >= 25 && isYahtzee) {
-        document.getElementById('celeb-overlay').style.display = 'flex';
-        setTimeout(() => document.getElementById('celeb-overlay').style.display = 'none', 3000);
+        let msg = playerName === "りんかちゃん" ? "えらいね！" : "すごい！おめでとう！";
+        let overlay = document.getElementById('celeb-overlay');
+        overlay.innerHTML = `<div class="celeb-content"><h1 style="color: #ffb7c5;">Y A H T Z E E</h1><p style="color: white; font-size: 1.5em;">${msg}</p></div>`;
+        overlay.style.display = 'flex';
+        setTimeout(() => overlay.style.display = 'none', 3000);
     }
 };
 
-function calculateScore(category, dice) {
+function calculateScore(category, dice, isJoker) {
     let sum = dice.reduce((a, b) => a + b, 0);
     let counts = {};
     dice.forEach(d => counts[d] = (counts[d] || 0) + 1);
@@ -148,6 +192,14 @@ function calculateScore(category, dice) {
         let num = parseInt(category[0]);
         return dice.filter(d => d === num).reduce((a, b) => a + b, 0);
     }
+
+    if (isJoker) {
+        if (category === 'fh') return 25;
+        if (category === 'ss') return 30;
+        if (category === 'ls') return 40;
+        if (category === '3k' || category === '4k' || category === 'ch') return sum;
+    }
+
     if (category === '3k') return values.some(v => v >= 3) ? sum : 0;
     if (category === '4k') return values.some(v => v >= 4) ? sum : 0;
     if (category === 'ch') return sum;
@@ -176,8 +228,8 @@ function listenToRoom() {
         playerData = playerNum === 1 ? data.p1 : data.p2;
         opponentData = playerNum === 1 ? data.p2 : data.p1;
         
-        if (!playerData) playerData = { scores: {} };
-        if (!opponentData) opponentData = { scores: {} };
+        if (!playerData) playerData = { scores: {}, yahtzeeBonuses: 0 };
+        if (!opponentData) opponentData = { scores: {}, yahtzeeBonuses: 0 };
         
         updateUI();
         checkGameOver();
@@ -205,7 +257,12 @@ function updateUI() {
     categories.forEach(c => {
         let p1Val = playerNum === 1 ? playerData.scores[c] : opponentData.scores[c];
         if (p1Val !== undefined && p1Val !== 'ー') {
-            document.getElementById(`s1-${c}`).innerText = p1Val;
+            let p1Bonus = playerNum === 1 ? (playerData.yahtzeeBonuses || 0) : (opponentData.yahtzeeBonuses || 0);
+            if (c === 'yz' && p1Bonus > 0) {
+                document.getElementById(`s1-${c}`).innerText = `50+${p1Bonus * 100}`;
+            } else {
+                document.getElementById(`s1-${c}`).innerText = p1Val;
+            }
             myTotal += (playerNum === 1 ? p1Val : 0);
             oppTotal += (playerNum !== 1 ? p1Val : 0);
             if (['1s','2s','3s','4s','5s','6s'].includes(c)) {
@@ -217,7 +274,12 @@ function updateUI() {
 
         let p2Val = playerNum === 2 ? playerData.scores[c] : opponentData.scores[c];
         if (p2Val !== undefined && p2Val !== 'ー') {
-            document.getElementById(`s2-${c}`).innerText = p2Val;
+            let p2Bonus = playerNum === 2 ? (playerData.yahtzeeBonuses || 0) : (opponentData.yahtzeeBonuses || 0);
+            if (c === 'yz' && p2Bonus > 0) {
+                document.getElementById(`s2-${c}`).innerText = `50+${p2Bonus * 100}`;
+            } else {
+                document.getElementById(`s2-${c}`).innerText = p2Val;
+            }
             myTotal += (playerNum === 2 ? p2Val : 0);
             oppTotal += (playerNum !== 2 ? p2Val : 0);
             if (['1s','2s','3s','4s','5s','6s'].includes(c)) {
@@ -230,9 +292,12 @@ function updateUI() {
 
     let myUpperBonus = myUpper >= 63 ? 35 : 0;
     let oppUpperBonus = oppUpper >= 63 ? 35 : 0;
+    
+    let myYBonusPts = (playerData.yahtzeeBonuses || 0) * 100;
+    let oppYBonusPts = (opponentData.yahtzeeBonuses || 0) * 100;
 
-    myTotal += myUpperBonus;
-    oppTotal += oppUpperBonus;
+    myTotal += myUpperBonus + myYBonusPts;
+    oppTotal += oppUpperBonus + oppYBonusPts;
 
     document.getElementById(`s${playerNum}-bonus`).innerText = `${myUpperBonus} (${Math.max(0, 63 - myUpper)} のこり)`;
     document.getElementById(`s${playerNum === 1 ? 2 : 1}-bonus`).innerText = `${oppUpperBonus} (${Math.max(0, 63 - oppUpper)} のこり)`;
@@ -252,14 +317,23 @@ function checkGameOver() {
         let myTotal = parseInt(document.getElementById(`s${playerNum}-total`).innerText);
         let oppTotal = parseInt(document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText);
         
-        let msg = myTotal > oppTotal ? "あなたの勝ち！ (You Win!)" : myTotal < oppTotal ? "あいての勝ち！ (They Win!)" : "引き分け！ (Tie!)";
+        let msg = "";
+        if (myTotal > oppTotal) {
+            msg = playerName === "りんかちゃん" ? "大好きだよ" : "かち";
+        } else if (myTotal < oppTotal) {
+            msg = "まけ";
+        } else {
+            msg = "引き分け！";
+        }
         
         document.getElementById("game-over-title").innerText = msg;
         document.getElementById("game-over-msg").innerText = `${myTotal} pt  vs  ${oppTotal} pt`;
         document.getElementById("game-over-overlay").style.display = 'flex';
         
         if (myTotal > 0 && !playerData.scoreSaved) {
-            push(ref(db, 'highscores'), { name: playerName, score: myTotal });
+            const d = new Date();
+            const formattedDate = `${d.getMonth() + 1}.${d.getDate().toString().padStart(2, '0')}.${d.getFullYear().toString().slice(-2)}`;
+            push(ref(db, 'highscores'), { name: playerName, score: myTotal, date: formattedDate });
             playerData.scoreSaved = true;
             update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scoreSaved: true });
         }
@@ -274,9 +348,10 @@ function loadHighScores() {
         
         const list = document.getElementById("high-scores");
         list.innerHTML = "";
-        scores.slice(0, 10).forEach(score => {
+        scores.slice(0, 15).forEach(score => {
             let li = document.createElement("li");
-            li.innerText = `${score.score}pt - ${score.name}`;
+            let dateStr = score.date ? score.date : '0.00.00';
+            li.innerText = `${dateStr} - ${score.score}pt - ${score.name}`;
             list.appendChild(li);
         });
     });
@@ -287,7 +362,7 @@ window.requestRematch = async function() {
     let emptyScores = {};
     categories.forEach(c => emptyScores[c] = 'ー');
     await update(ref(db, `rooms/${currentRoom}`), {
-        [`p${playerNum}`]: { name: playerName, scores: emptyScores, scoreSaved: false, ready: true },
+        [`p${playerNum}`]: { name: playerName, scores: emptyScores, yahtzeeBonuses: 0, scoreSaved: false, ready: true },
         turn: 1,
         rollsLeft: 3,
         dice: [1, 1, 1, 1, 1],
