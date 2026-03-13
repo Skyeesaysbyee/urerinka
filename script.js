@@ -204,10 +204,14 @@ function calculateScore(category, dice, isJoker) {
     if (category === 'yz') return values.some(v => v === 5) ? 50 : 0;
     if (category === 'fh') return (values.includes(3) && values.includes(2)) || values.includes(5) ? 25 : 0;
     
-    let uniqueDice = [...new Set(dice)].sort();
-    let straightStr = uniqueDice.join('');
-    if (category === 'ss') return (straightStr.includes('1234') || straightStr.includes('2345') || straightStr.includes('3456')) ? 30 : 0;
-    if (category === 'ls') return (straightStr.includes('12345') || straightStr.includes('23456')) ? 40 : 0;
+    // Straight Logic Fix
+    let uniqueDice = [...new Set(dice)].sort((a, b) => a - b).join('');
+    if (category === 'ss') {
+        return (uniqueDice.includes('1234') || uniqueDice.includes('2345') || uniqueDice.includes('3456')) ? 30 : 0;
+    }
+    if (category === 'ls') {
+        return (uniqueDice === '12345' || uniqueDice === '23456') ? 40 : 0;
+    }
     
     return 0;
 }
