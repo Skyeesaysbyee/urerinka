@@ -38,7 +38,7 @@ window.handleLogin = async function() {
         playerData = { name: playerName, scores: empty, yahtzeeBonuses: 0, ready: true };
         await set(roomRef, { 
             p1: playerData, 
-            turn: 1, // Force P1 to go first
+            turn: 1, 
             rollsLeft: 3, 
             dice: [1, 1, 1, 1, 1], 
             held: [false, false, false, false, false] 
@@ -144,7 +144,6 @@ function listenToRoom() {
         currentTurn = data.turn; rollsLeft = data.rollsLeft;
         currentDice = data.dice || [1,1,1,1,1]; heldDice = data.held || [false,false,false,false,false];
         
-        // Safety check to prevent undefined names
         playerData = (playerNum === 1 ? data.p1 : data.p2) || { name: playerName, scores: {}, yahtzeeBonuses: 0 };
         opponentData = (playerNum === 1 ? data.p2 : data.p1) || { name: "あいて", scores: {}, yahtzeeBonuses: 0 };
         
@@ -162,7 +161,6 @@ function updateUI() {
         die.className = heldDice[i] ? "dice held" : "dice";
     }
 
-    // Fix P1/P2 Labels to never show undefined
     document.getElementById("p1-label").innerText = (playerNum === 1 ? playerName : (opponentData.name || "あいて"));
     document.getElementById("p2-label").innerText = (playerNum === 2 ? playerName : (opponentData.name || "あいて"));
     
@@ -172,7 +170,6 @@ function updateUI() {
 
     categories.forEach(c => {
         for (let p = 1; p <= 2; p++) {
-            // Get data based on absolute player number (P1 or P2)
             const roomDataRef = (p === playerNum) ? playerData : opponentData;
             let cell = document.getElementById(`s${p}-${c}`);
             let score = (roomDataRef && roomDataRef.scores) ? roomDataRef.scores[c] : 'ー';
@@ -199,7 +196,6 @@ function updateUI() {
     document.getElementById(`s1-bonus`).innerText = b1 === 35 ? "35" : `0 (${63 - uppers[0]} のこり)`;
     document.getElementById(`s2-bonus`).innerText = b2 === 35 ? "35" : `0 (${63 - uppers[1]} のこり)`;
 
-    // Calculate totals correctly based on player data
     let p1BonusCount = playerNum === 1 ? (playerData.yahtzeeBonuses || 0) : (opponentData.yahtzeeBonuses || 0);
     let p2BonusCount = playerNum === 2 ? (playerData.yahtzeeBonuses || 0) : (opponentData.yahtzeeBonuses || 0);
 
@@ -211,7 +207,9 @@ function updateUI() {
 }
 
 function checkGameOver() {
-    if (categories.every(c => playerData.scores[c] !== 'ー' && (opponentData.scores && opponentData.scores[c] !== 'ー'))) {
+    const allDone = categories.every(c => playerData.scores[c] !== 'ー' && (opponentData.scores && opponentData.scores[c] !== 'ー'));
+    
+    if (allDone) {
         let myT = parseInt(document.getElementById(`s${playerNum}-total`).innerText);
         let oppT = parseInt(document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText);
 
@@ -224,27 +222,48 @@ function checkGameOver() {
             const d = new Date();
             const dateStr = `${d.getMonth()+1}.${d.getDate().toString().padStart(2,'0')}.${d.getFullYear().toString().slice(-2)}`;
             
-            push(ref(db, 'highscores'), { name: playerName, score: myT, date: dateStr }).then(() => {
+            console.log("Attempting to save score...");
+            const scoresRef = ref(db, 'highscores');
+            
+            push(scoresRef, {
+                name: playerName,
+                score: myT,
+                date: dateStr
+            }).then(() => {
+                console.log("Score saved successfully!");
                 playerData.scoreSaved = true;
                 update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scoreSaved: true });
+            }).catch((err) => {
+                console.error("Firebase Save Error:", err);
             });
         }
     }
 }
 
 function loadHighScores() {
-    onValue(ref(db, 'highscores'), (snap) => {
-        let scores = []; snap.forEach(c => scores.push(c.val()));
+    const scoresRef = ref(db, 'highscores');
+    onValue(scoresRef, (snap) => {
+        let scores = [];
+        if (snap.exists()) {
+            snap.forEach(child => {
+                scores.push(child.val());
+            });
+        }
         scores.sort((a, b) => b.score - a.score);
+        
         const list = document.getElementById("high-scores");
         if (list) {
             list.innerHTML = "";
             scores.slice(0, 15).forEach(s => {
                 let li = document.createElement("li");
+                li.style.color = "#ffb7c5";
+                li.style.marginBottom = "5px";
                 li.innerText = `${s.date || '0.00.00'} - ${s.score}pt - ${s.name}`;
                 list.appendChild(li);
             });
         }
+    }, (error) => {
+        console.error("Leaderboard load error:", error);
     });
 }
 
