@@ -1,8 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, onValue, update, get, remove, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-document.head.insertAdjacentHTML("beforeend", `<style>th:nth-child(2), td:nth-child(2) { border-left: 2px solid #333; }</style>`);
-
+// --- FIREBASE SETUP ---
 const firebaseConfig = {
     apiKey: "AIzaSyDXi3GXU8rM7WyTZhoa4KdLkmD_kkn-X6U",
     authDomain: "urerinka.firebaseapp.com",
@@ -16,6 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// --- VARIABLES ---
 let currentRoom = null; let playerNum = null; let playerName = "";
 let currentTurn = 1; let rollsLeft = 3;
 let currentDice = [1, 1, 1, 1, 1]; let heldDice = [false, false, false, false, false];
@@ -23,22 +23,25 @@ let p1Data = { name: "P1", scores: {}, yahtzeeBonuses: 0 };
 let p2Data = { name: "P2", scores: {}, yahtzeeBonuses: 0 };
 const categories = ['1s', '2s', '3s', '4s', '5s', '6s', '3k', '4k', 'fh', 'ss', 'ls', 'yz', 'ch'];
 
-loadHighScores();
+// --- INITIAL LOAD ---
+document.addEventListener("DOMContentLoaded", () => {
+    loadHighScores();
+});
 
+// --- NAVIGATION ---
 window.openGame = function(gameId) {
     if (gameId === 'yahtzee') {
         document.getElementById("home-hub").style.display = "none";
         document.getElementById("start-screen").style.display = "block";
-        document.getElementById("leaderboard-area").style.display = "block";
     }
 };
 
 window.goBack = function() {
     document.getElementById("home-hub").style.display = "block";
     document.getElementById("start-screen").style.display = "none";
-    document.getElementById("leaderboard-area").style.display = "none";
 };
 
+// --- CORE GAME FUNCTIONS ---
 window.handleLogin = async function() {
     playerName = document.getElementById("player-name").value.trim();
     let roomInput = document.getElementById("room-id-input").value.trim();
@@ -68,16 +71,6 @@ window.handleLogin = async function() {
     listenToRoom();
 };
 
-window.leaveRoom = async function() {
-    if (currentRoom) {
-        const roomRef = ref(db, `rooms/${currentRoom}`);
-        await update(roomRef, { [`p${playerNum}`]: null });
-        const snap = await get(roomRef);
-        if (snap.exists() && !snap.val().p1 && !snap.val().p2) await remove(roomRef);
-    }
-    location.reload(); 
-};
-
 window.rollDice = async function() {
     if (currentTurn !== playerNum || rollsLeft <= 0) return;
     for (let i = 0; i < 5; i++) {
@@ -101,14 +94,12 @@ window.attemptScore = async function(category) {
     let hasYzScore = (myData.scores['yz'] === 50);
     let isJoker = (isYz && hasYzScore);
 
-    // If Joker, check if the corresponding Upper Section is free first
     if (isJoker && myData.scores[currentDice[0]+'s'] === 'ー' && category !== currentDice[0]+'s') {
         alert("まず数字のボックスを埋めてください！"); return;
     }
 
     let score = calculateScore(category, currentDice, isJoker);
     myData.scores[category] = score;
-    
     if (isJoker) myData.yahtzeeBonuses = (myData.yahtzeeBonuses || 0) + 1;
     
     currentTurn = (playerNum === 1) ? 2 : 1;
@@ -119,13 +110,6 @@ window.attemptScore = async function(category) {
         dice: [1,1,1,1,1], 
         held: [false,false,false,false,false] 
     });
-
-    if (score >= 25 && isYz) {
-        let msg = playerName === "りんかちゃん" ? "えらいね！" : "すごい！";
-        document.getElementById('celeb-overlay').innerHTML = `<div class="celeb-content"><h1 style="color:#ffb7c5;">Y A H T Z E E</h1><p style="color:white;">${msg}</p></div>`;
-        document.getElementById('celeb-overlay').style.display = 'flex';
-        setTimeout(() => document.getElementById('celeb-overlay').style.display = 'none', 3000);
-    }
 };
 
 function calculateScore(cat, dice, joker) {
@@ -180,42 +164,38 @@ function updateUI() {
         die.className = heldDice[i] ? "dice held" : "dice";
     }
 
-    // Fixed Mapping: P1 is Left Column (s1), P2 is Right Column (s2)
     document.getElementById("p1-label").innerText = p1Data.name;
     document.getElementById("p2-label").innerText = p2Data.name;
     
     let p1Upper = 0, p2Upper = 0;
-    let p1Total = 0, p2Total = 0;
-
+    let p1Lower = 0, p2Lower = 0;
     let isYz = currentDice.every(v => v === currentDice[0]);
 
     categories.forEach(c => {
-        // Handle Column 1 (P1)
+        // P1 Column
         let cell1 = document.getElementById(`s1-${c}`);
         let score1 = p1Data.scores[c];
         let joker1 = (isYz && p1Data.scores['yz'] === 50);
-
         if (score1 !== undefined && score1 !== 'ー') {
             cell1.innerText = (c === 'yz' && p1Data.yahtzeeBonuses > 0) ? `50+${p1Data.yahtzeeBonuses*100}` : score1;
             cell1.style.color = "#fff";
-            p1Total += (typeof score1 === 'number' ? score1 : 0);
-            if (['1s','2s','3s','4s','5s','6s'].includes(c)) p1Upper += score1;
+            let val = typeof score1 === 'number' ? score1 : 0;
+            if (['1s','2s','3s','4s','5s','6s'].includes(c)) p1Upper += val; else p1Lower += val;
         } else {
             if (playerNum === 1 && currentTurn === 1 && rollsLeft < 3) {
                 cell1.innerHTML = `<span style="color:#ffb7c5; opacity:0.6;">${calculateScore(c, currentDice, joker1)}</span>`;
             } else { cell1.innerText = 'ー'; cell1.style.color = "#888"; }
         }
 
-        // Handle Column 2 (P2)
+        // P2 Column
         let cell2 = document.getElementById(`s2-${c}`);
         let score2 = p2Data.scores[c];
         let joker2 = (isYz && p2Data.scores['yz'] === 50);
-
         if (score2 !== undefined && score2 !== 'ー') {
             cell2.innerText = (c === 'yz' && p2Data.yahtzeeBonuses > 0) ? `50+${p2Data.yahtzeeBonuses*100}` : score2;
             cell2.style.color = "#fff";
-            p2Total += (typeof score2 === 'number' ? score2 : 0);
-            if (['1s','2s','3s','4s','5s','6s'].includes(c)) p2Upper += score2;
+            let val = typeof score2 === 'number' ? score2 : 0;
+            if (['1s','2s','3s','4s','5s','6s'].includes(c)) p2Upper += val; else p2Lower += val;
         } else {
             if (playerNum === 2 && currentTurn === 2 && rollsLeft < 3) {
                 cell2.innerHTML = `<span style="color:#ffb7c5; opacity:0.6;">${calculateScore(c, currentDice, joker2)}</span>`;
@@ -223,15 +203,13 @@ function updateUI() {
         }
     });
     
-    let b1 = p1Upper >= 63 ? 35 : 0; 
-    let b2 = p2Upper >= 63 ? 35 : 0;
-    p1Total += b1 + ((p1Data.yahtzeeBonuses || 0) * 100);
-    p2Total += b2 + ((p2Data.yahtzeeBonuses || 0) * 100);
-    
+    let b1 = p1Upper >= 63 ? 35 : 0; let b2 = p2Upper >= 63 ? 35 : 0;
+    let finalP1 = p1Upper + b1 + p1Lower + ((p1Data.yahtzeeBonuses || 0) * 100);
+    let finalP2 = p2Upper + b2 + p2Lower + ((p2Data.yahtzeeBonuses || 0) * 100);
     document.getElementById(`s1-bonus`).innerText = `${b1} (${Math.max(0, 63 - p1Upper)} のこり)`;
     document.getElementById(`s2-bonus`).innerText = `${b2} (${Math.max(0, 63 - p2Upper)} のこり)`;
-    document.getElementById(`s1-total`).innerText = p1Total;
-    document.getElementById(`s2-total`).innerText = p2Total;
+    document.getElementById(`s1-total`).innerText = finalP1;
+    document.getElementById(`s2-total`).innerText = finalP2;
 }
 
 function checkGameOver() {
@@ -242,16 +220,16 @@ function checkGameOver() {
         let p2T = parseInt(document.getElementById(`s2-total`).innerText);
         let myT = playerNum === 1 ? p1T : p2T;
         let oppT = playerNum === 1 ? p2T : p1T;
-        let msg = myT > oppT ? (playerName === "りんかちゃん" ? "大好きだよ" : "かち") : (myT < oppT ? "まけ" : "引き分け！");
-        document.getElementById("game-over-title").innerText = msg;
+        document.getElementById("game-over-title").innerText = myT > oppT ? (playerName === "りんかちゃん" ? "大好きだよ" : "かち") : "まけ";
         document.getElementById("game-over-msg").innerText = `${myT} pt vs ${oppT} pt`;
         document.getElementById("game-over-overlay").style.display = 'flex';
+        
         let myData = playerNum === 1 ? p1Data : p2Data;
         if (myT > 0 && !myData.scoreSaved) {
+            myData.scoreSaved = true;
             const d = new Date();
             const dateStr = `${d.getMonth()+1}.${d.getDate().toString().padStart(2,'0')}.${d.getFullYear().toString().slice(-2)}`;
             push(ref(db, 'highscores'), { name: playerName, score: myT, date: dateStr }).then(() => {
-                myData.scoreSaved = true;
                 update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scoreSaved: true });
             });
         }
@@ -261,7 +239,10 @@ function checkGameOver() {
 function loadHighScores() {
     onValue(ref(db, 'highscores'), (snap) => {
         let scores = [];
-        if (snap.exists()) snap.forEach(child => scores.push(child.val()));
+        if (snap.exists()) snap.forEach(child => { 
+            let d = child.val();
+            if (d && d.score) scores.push(d);
+        });
         scores.sort((a, b) => b.score - a.score);
         const list = document.getElementById("high-scores");
         if (list) {
@@ -277,15 +258,10 @@ function loadHighScores() {
     });
 }
 
-window.requestRematch = async function() {
+window.leaveRoom = () => location.reload();
+window.requestRematch = async () => {
     document.getElementById("game-over-overlay").style.display = 'none';
     let empty = {}; categories.forEach(c => empty[c] = 'ー');
-    let myData = playerNum === 1 ? p1Data : p2Data;
-    myData.scores = empty;
-    myData.yahtzeeBonuses = 0;
-    myData.scoreSaved = false;
-    await update(ref(db, `rooms/${currentRoom}`), { 
-        [`p${playerNum}`]: myData, 
-        turn: 1, rollsLeft: 3, dice: [1, 1, 1, 1, 1], held: [false, false, false, false, false] 
-    });
+    await update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scores: empty, yahtzeeBonuses: 0, scoreSaved: false });
+    await update(ref(db, `rooms/${currentRoom}`), { turn: 1, rollsLeft: 3, dice: [1,1,1,1,1], held:[false,false,false,false,false] });
 };
