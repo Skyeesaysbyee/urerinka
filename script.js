@@ -22,8 +22,24 @@ let currentDice = [1, 1, 1, 1, 1]; let heldDice = [false, false, false, false, f
 let playerData = { scores: {}, yahtzeeBonuses: 0 }; let opponentData = { scores: {}, yahtzeeBonuses: 0 };
 const categories = ['1s', '2s', '3s', '4s', '5s', '6s', '3k', '4k', 'fh', 'ss', 'ls', 'yz', 'ch'];
 
+// Load rankings immediately
 loadHighScores();
 
+// --- NAVIGATION LOGIC ---
+window.openGame = function(gameId) {
+    if (gameId === 'yahtzee') {
+        document.getElementById("home-hub").style.display = "none";
+        document.getElementById("start-screen").style.display = "block";
+    }
+    // 'blackjack' is locked in HTML, so no action needed here yet
+};
+
+window.goBack = function() {
+    document.getElementById("home-hub").style.display = "block";
+    document.getElementById("start-screen").style.display = "none";
+};
+
+// --- GAME LOGIC ---
 window.handleLogin = async function() {
     playerName = document.getElementById("player-name").value.trim();
     let roomInput = document.getElementById("room-id-input").value.trim();
@@ -43,6 +59,9 @@ window.handleLogin = async function() {
         await update(roomRef, { [`p${playerNum}`]: playerData });
     }
     onDisconnect(ref(db, `rooms/${currentRoom}/p${playerNum}`)).remove();
+    
+    // Hide all entry screens and show game
+    document.getElementById("home-hub").style.display = "none";
     document.getElementById("start-screen").style.display = "none";
     document.getElementById("game-screen").style.display = "block";
     document.getElementById("room-display").innerText = `ルーム: ${currentRoom}`;
@@ -83,7 +102,6 @@ window.toggleHold = async function(i) {
 window.attemptScore = async function(category) {
     if (currentTurn !== playerNum || playerData.scores[category] !== 'ー') return;
     
-    // Joker Logic
     let isYz = currentDice.every(v => v === currentDice[0]);
     let isBonus = (isYz && (playerData.scores['yz'] === 50));
     
@@ -119,7 +137,6 @@ function calculateScore(cat, dice, joker) {
     let sum = dice.reduce((a, b) => a + b, 0);
     let has = (n) => dice.includes(n);
 
-    // Joker Rule: Full House and Straights are automatic if joker is active
     if (joker) {
         if (cat === 'fh') return 25; 
         if (cat === 'ss') return 30; 
@@ -154,6 +171,8 @@ function listenToRoom() {
 }
 
 function updateUI() {
+    if (document.getElementById("game-screen").style.display === "none") return;
+    
     document.getElementById("turn-display").innerText = currentTurn === playerNum ? "あなたの番" : "あいての番";
     document.getElementById("roll-count").innerText = `のこり: ${rollsLeft}番`;
     document.getElementById("roll-btn").disabled = (currentTurn !== playerNum || rollsLeft <= 0);
@@ -196,59 +215,36 @@ function updateUI() {
     document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText = oppT;
 }
 
-// RESTORED YOUR HIGH SCORE LOGIC
 function checkGameOver() {
     const allDone = categories.every(c => playerData.scores[c] !== 'ー' && (opponentData.scores && opponentData.scores[c] !== 'ー'));
-    
     if (allDone) {
         let myT = parseInt(document.getElementById(`s${playerNum}-total`).innerText);
         let oppT = parseInt(document.getElementById(`s${playerNum === 1 ? 2 : 1}-total`).innerText);
-
         let msg = myT > oppT ? (playerName === "りんかちゃん" ? "大好きだよ" : "かち") : (myT < oppT ? "まけ" : "引き分け！");
         document.getElementById("game-over-title").innerText = msg;
         document.getElementById("game-over-msg").innerText = `${myT} pt vs ${oppT} pt`;
         document.getElementById("game-over-overlay").style.display = 'flex';
-        
-        // Ensure we only save once and only if score is > 0
         if (myT > 0 && !playerData.scoreSaved) {
             const d = new Date();
             const dateStr = `${d.getMonth()+1}.${d.getDate().toString().padStart(2,'0')}.${d.getFullYear().toString().slice(-2)}`;
-            
-            console.log("Attempting to save score...");
             const scoresRef = ref(db, 'highscores');
-            
-            push(scoresRef, {
-                name: playerName,
-                score: myT,
-                date: dateStr
-            }).then(() => {
-                console.log("Score saved successfully!");
+            push(scoresRef, { name: playerName, score: myT, date: dateStr }).then(() => {
                 playerData.scoreSaved = true;
                 update(ref(db, `rooms/${currentRoom}/p${playerNum}`), { scoreSaved: true });
-            }).catch((err) => {
-                console.error("Firebase Save Error:", err);
             });
         }
     }
 }
 
-// RESTORED YOUR HIGH SCORE LOGIC
 function loadHighScores() {
     const scoresRef = ref(db, 'highscores');
     onValue(scoresRef, (snap) => {
         let scores = [];
-        if (snap.exists()) {
-            snap.forEach(child => {
-                scores.push(child.val());
-            });
-        }
-        // Sort highest to lowest
+        if (snap.exists()) { snap.forEach(child => { scores.push(child.val()); }); }
         scores.sort((a, b) => b.score - a.score);
-        
         const list = document.getElementById("high-scores");
         if (list) {
             list.innerHTML = "";
-            // Only show top 15
             scores.slice(0, 15).forEach(s => {
                 let li = document.createElement("li");
                 li.style.color = "#ffb7c5";
@@ -257,8 +253,6 @@ function loadHighScores() {
                 list.appendChild(li);
             });
         }
-    }, (error) => {
-        console.error("Leaderboard load error:", error);
     });
 }
 
