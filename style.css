@@ -145,9 +145,10 @@ input[type="text"]:focus {
     font-size: 0.9rem;
     color: #ccc;
     line-height: 1.8;
+    padding-left: 0;
 }
 
-/* Dice and Table (For when the game starts) */
+/* Dice and Table */
 #dice-area {
     display: flex;
     justify-content: space-between;
@@ -185,7 +186,7 @@ td, th {
     font-size: 0.85rem;
 }
 
-/* Overlay / YAHTZEE screen */
+/* Overlays */
 #celeb-overlay {
     display: none;
     position: fixed;
