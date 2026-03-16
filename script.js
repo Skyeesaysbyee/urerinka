@@ -33,12 +33,14 @@ window.openGame = function(gameId) {
     if (gameId === 'yahtzee') {
         document.getElementById("home-hub").style.display = "none";
         document.getElementById("start-screen").style.display = "block";
+        document.getElementById("leaderboard-area").style.display = "block";
     }
 };
 
 window.goBack = function() {
     document.getElementById("home-hub").style.display = "block";
     document.getElementById("start-screen").style.display = "none";
+    document.getElementById("leaderboard-area").style.display = "none";
 };
 
 // --- CORE GAME FUNCTIONS ---
@@ -63,6 +65,7 @@ window.handleLogin = async function() {
         await update(roomRef, { [`p${playerNum}`]: newPlayerData });
     }
     onDisconnect(ref(db, `rooms/${currentRoom}/p${playerNum}`)).remove();
+    
     document.getElementById("home-hub").style.display = "none";
     document.getElementById("start-screen").style.display = "none";
     document.getElementById("leaderboard-area").style.display = "none";
@@ -94,9 +97,7 @@ window.attemptScore = async function(category) {
     let hasYzScore = (myData.scores['yz'] === 50);
     let isJoker = (isYz && hasYzScore);
 
-    if (isJoker && myData.scores[currentDice[0]+'s'] === 'ー' && category !== currentDice[0]+'s') {
-        alert("まず数字のボックスを埋めてください！"); return;
-    }
+    // RESTRICTION REMOVED: You can now click straights/full house immediately on second Yahtzee.
 
     let score = calculateScore(category, currentDice, isJoker);
     myData.scores[category] = score;
@@ -259,6 +260,7 @@ function loadHighScores() {
 }
 
 window.leaveRoom = () => location.reload();
+
 window.requestRematch = async () => {
     document.getElementById("game-over-overlay").style.display = 'none';
     let empty = {}; categories.forEach(c => empty[c] = 'ー');
