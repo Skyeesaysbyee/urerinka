@@ -11,7 +11,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.png">
 
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
     <div id="game-container">
@@ -32,10 +32,6 @@
                 </div>
             </div>
         </div>
-        <div id="leaderboard-area" style="display: none; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
-            <h3 style="color: #ffb7c5; margin-bottom: 15px; text-align: center;">ランキング</h3>
-            <ol id="high-scores" style="list-style-position: inside; text-align: left;"></ol>
-        </div>
 
         <div id="start-screen" style="display: none;">
             <button onclick="goBack()" style="background:none; border:none; color:#888; cursor:pointer; margin-bottom:20px; font-size: 0.9rem;">← もどる</button>
@@ -46,6 +42,11 @@
                 <input type="text" id="room-id-input" placeholder="ルームID" style="margin-bottom: 0; width: 50%;">
                 <button onclick="handleLogin()" class="main-btn" style="margin-bottom: 0; padding: 10px 20px;">はい</button>
             </div>
+        </div>
+
+        <div id="leaderboard-area" style="display: none; margin-top: 30px; border-top: 1px solid #222; padding-top: 20px;">
+            <h3 style="color: #ffb7c5; margin-bottom: 15px; text-align: center;">ランキング</h3>
+            <ol id="high-scores" style="list-style-position: inside; text-align: left;"></ol>
         </div>
 
         <div id="game-screen" style="display: none;">
@@ -96,7 +97,7 @@
             </div>
         </div>
 
-        <div id="celeb-overlay" onclick="this.style.display='none'">
+        <div id="celeb-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;" onclick="this.style.display='none'">
             <div class="celeb-content">
                 <h1 style="color: #ffb7c5;">Y A H T Z E E</h1>
                 <p style="color: white; font-size: 1.5em;">すごい！おめでとう！</p>
