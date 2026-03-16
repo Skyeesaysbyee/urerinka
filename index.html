@@ -1,21 +1,30 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>りんかへ</title>
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icon.png">
-
-    <link rel="stylesheet" href="style.css">
-</head>
 <body>
     <div id="game-container">
-        <div id="start-screen">
+        
+        <div id="home-hub">
+            <h2 style="color: #ffb7c5; margin-bottom: 30px;">りんかのあそびば</h2>
+            <div class="menu-grid">
+                <div class="menu-card" onclick="openGame('yahtzee')">
+                    <div class="icon">🎲</div>
+                    <h3>YAHTZEE</h3>
+                    <p>ずっとあそぼうね</p>
+                </div>
+                
+                <div class="menu-card locked">
+                    <div class="icon">🃏</div>
+                    <h3>21</h3>
+                    <p>もうすぐ...</p>
+                </div>
+            </div>
+
+            <div id="leaderboard-area">
+                <h3>ランキング</h3>
+                <ol id="high-scores"></ol>
+            </div>
+        </div>
+
+        <div id="start-screen" style="display: none;">
+            <button onclick="goBack()" style="background:none; border:none; color:#888; cursor:pointer; margin-bottom:20px; font-size: 0.9rem;">← もどる</button>
             <h2 style="color: #ffb7c5;">ずっとY A H T Z E Eしようね！</h2>
             <p>名前は</p>
             <input type="text" id="player-name" placeholder="なまえ">
@@ -26,7 +35,7 @@
         </div>
 
         <div id="game-screen" style="display: none;">
-            <div class="header-row" style="align-items: center;">
+            <div class="header-row" style="align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px;">
                 <span id="room-display" style="color: #aaa; font-size: 0.8em;"></span>
                 <span id="turn-display" style="color: #ffb7c5; font-weight: bold;"></span>
                 <button onclick="leaveRoom()" style="background: #333; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8em;">リーブ</button>
@@ -53,29 +62,24 @@
                         </tr>
                     </thead>
                     <tbody id="score-body">
-                        <tr onclick="attemptScore('1s', 1)"><td>一</td><td id="s1-1s">ー</td><td id="s2-1s">ー</td></tr>
-                        <tr onclick="attemptScore('2s', 2)"><td>二</td><td id="s1-2s">ー</td><td id="s2-2s">ー</td></tr>
-                        <tr onclick="attemptScore('3s', 3)"><td>三</td><td id="s1-3s">ー</td><td id="s2-3s">ー</td></tr>
-                        <tr onclick="attemptScore('4s', 4)"><td>四</td><td id="s1-4s">ー</td><td id="s2-4s">ー</td></tr>
-                        <tr onclick="attemptScore('5s', 5)"><td>五</td><td id="s1-5s">ー</td><td id="s2-5s">ー</td></tr>
-                        <tr onclick="attemptScore('6s', 6)"><td>六</td><td id="s1-6s">ー</td><td id="s2-6s">ー</td></tr>
+                        <tr onclick="attemptScore('1s')"><td>一</td><td id="s1-1s">ー</td><td id="s2-1s">ー</td></tr>
+                        <tr onclick="attemptScore('2s')"><td>二</td><td id="s1-2s">ー</td><td id="s2-2s">ー</td></tr>
+                        <tr onclick="attemptScore('3s')"><td>三</td><td id="s1-3s">ー</td><td id="s2-3s">ー</td></tr>
+                        <tr onclick="attemptScore('4s')"><td>四</td><td id="s1-4s">ー</td><td id="s2-4s">ー</td></tr>
+                        <tr onclick="attemptScore('5s')"><td>五</td><td id="s1-5s">ー</td><td id="s2-5s">ー</td></tr>
+                        <tr onclick="attemptScore('6s')"><td>六</td><td id="s1-6s">ー</td><td id="s2-6s">ー</td></tr>
                         <tr class="info-row"><td>ボーナス</td><td id="s1-bonus">0 (63 のこり)</td><td id="s2-bonus">0 (63 のこり)</td></tr>
-                        <tr onclick="attemptScore('3k', '3k')"><td>スリーカード</td><td id="s1-3k">ー</td><td id="s2-3k">ー</td></tr>
-                        <tr onclick="attemptScore('4k', '4k')"><td>フォーカード</td><td id="s1-4k">ー</td><td id="s2-4k">ー</td></tr>
-                        <tr onclick="attemptScore('fh', 'fh')"><td>フルハウス</td><td id="s1-fh">ー</td><td id="s2-fh">ー</td></tr>
-                        <tr onclick="attemptScore('ss', 'ss')"><td>スモールストレート</td><td id="s1-ss">ー</td><td id="s2-ss">ー</td></tr>
-                        <tr onclick="attemptScore('ls', 'ls')"><td>ラージストレート</td><td id="s1-ls">ー</td><td id="s2-ls">ー</td></tr>
-                        <tr onclick="attemptScore('yz', 'yz')"><td>Y A H T Z E E</td><td id="s1-yz">ー</td><td id="s2-yz">ー</td></tr>
-                        <tr onclick="attemptScore('ch', 'ch')"><td>チャンス</td><td id="s1-ch">ー</td><td id="s2-ch">ー</td></tr>
+                        <tr onclick="attemptScore('3k')"><td>スリーカード</td><td id="s1-3k">ー</td><td id="s2-3k">ー</td></tr>
+                        <tr onclick="attemptScore('4k')"><td>フォーカード</td><td id="s1-4k">ー</td><td id="s2-4k">ー</td></tr>
+                        <tr onclick="attemptScore('fh')"><td>フルハウス</td><td id="s1-fh">ー</td><td id="s2-fh">ー</td></tr>
+                        <tr onclick="attemptScore('ss')"><td>スモールストレート</td><td id="s1-ss">ー</td><td id="s2-ss">ー</td></tr>
+                        <tr onclick="attemptScore('ls')"><td>ラージストレート</td><td id="s1-ls">ー</td><td id="s2-ls">ー</td></tr>
+                        <tr onclick="attemptScore('yz')"><td>Y A H T Z E E</td><td id="s1-yz">ー</td><td id="s2-yz">ー</td></tr>
+                        <tr onclick="attemptScore('ch')"><td>チャンス</td><td id="s1-ch">ー</td><td id="s2-ch">ー</td></tr>
                         <tr class="total-row"><td>ごうけい</td><td id="s1-total">0</td><td id="s2-total">0</td></tr>
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <div id="leaderboard-area">
-            <h3>ランキング</h3>
-            <ol id="high-scores"></ol>
         </div>
 
         <div id="celeb-overlay" onclick="this.style.display='none'">
@@ -97,4 +101,3 @@
 
     <script type="module" src="script.js"></script>
 </body>
-</html>
