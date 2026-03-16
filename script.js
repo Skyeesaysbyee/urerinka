@@ -4,13 +4,13 @@ import { getDatabase, ref, set, onValue, update, get, remove, push, onDisconnect
 document.head.insertAdjacentHTML("beforeend", `<style>th:nth-child(2), td:nth-child(2) { border-left: 2px solid #333; }</style>`);
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDXi3GXU8rM7WyTZhoa4KdLkmD_kkn-X6U",
-  authDomain: "urerinka.firebaseapp.com",
-  databaseURL: "https://urerinka-default-rtdb.firebaseio.com/",
-  projectId: "urerinka",
-  storageBucket: "urerinka.firebasestorage.app",
-  messagingSenderId: "165176233749",
-  appId: "1:165176233749:web:e0ed16f948b0299a15631c"
+    apiKey: "AIzaSyDXi3GXU8rM7WyTZhoa4KdLkmD_kkn-X6U",
+    authDomain: "urerinka.firebaseapp.com",
+    databaseURL: "https://urerinka-default-rtdb.firebaseio.com/",
+    projectId: "urerinka",
+    storageBucket: "urerinka.firebasestorage.app",
+    messagingSenderId: "165176233749",
+    appId: "1:165176233749:web:e0ed16f948b0299a15631c"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -22,7 +22,7 @@ let currentDice = [1, 1, 1, 1, 1]; let heldDice = [false, false, false, false, f
 let playerData = { scores: {}, yahtzeeBonuses: 0 }; let opponentData = { scores: {}, yahtzeeBonuses: 0 };
 const categories = ['1s', '2s', '3s', '4s', '5s', '6s', '3k', '4k', 'fh', 'ss', 'ls', 'yz', 'ch'];
 
-// Load rankings immediately
+// Load rankings immediately in the background
 loadHighScores();
 
 // --- NAVIGATION LOGIC ---
@@ -30,6 +30,8 @@ window.openGame = function(gameId) {
     if (gameId === 'yahtzee') {
         document.getElementById("home-hub").style.display = "none";
         document.getElementById("start-screen").style.display = "block";
+        // Show the leaderboard ONLY when Yahtzee is clicked
+        document.getElementById("leaderboard-area").style.display = "block";
     }
     // 'blackjack' is locked in HTML, so no action needed here yet
 };
@@ -37,6 +39,8 @@ window.openGame = function(gameId) {
 window.goBack = function() {
     document.getElementById("home-hub").style.display = "block";
     document.getElementById("start-screen").style.display = "none";
+    // Hide the leaderboard again when returning to the hub
+    document.getElementById("leaderboard-area").style.display = "none";
 };
 
 // --- GAME LOGIC ---
@@ -48,6 +52,7 @@ window.handleLogin = async function() {
     const roomRef = ref(db, `rooms/${currentRoom}`);
     const snapshot = await get(roomRef);
     let empty = {}; categories.forEach(c => empty[c] = 'ー');
+    
     if (!snapshot.exists()) {
         playerNum = 1; playerData = { name: playerName, scores: empty, yahtzeeBonuses: 0, ready: true };
         await set(roomRef, { p1: playerData, turn: 1, rollsLeft: 3, dice: [1, 1, 1, 1, 1], held: [false, false, false, false, false] });
@@ -60,9 +65,10 @@ window.handleLogin = async function() {
     }
     onDisconnect(ref(db, `rooms/${currentRoom}/p${playerNum}`)).remove();
     
-    // Hide all entry screens and show game
+    // Hide all entry screens and the leaderboard, then show the game
     document.getElementById("home-hub").style.display = "none";
     document.getElementById("start-screen").style.display = "none";
+    document.getElementById("leaderboard-area").style.display = "none";
     document.getElementById("game-screen").style.display = "block";
     document.getElementById("room-display").innerText = `ルーム: ${currentRoom}`;
     listenToRoom();
