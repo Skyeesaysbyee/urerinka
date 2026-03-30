@@ -1,66 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>You found it!</title>
-    <link rel="stylesheet" href="../style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>えらいね</title>
     
+    <link rel="stylesheet" href="../style.css?v=5">
+
     <style>
-        /* Special styles just for this Easter Egg */
-        .easter-egg-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 80vh; 
-            text-align: center;
-            padding: 20px;
+        /* Custom styles just for this secret letter */
+        #letter-container {
+            text-align: left; /* Aligns text to the left for easier reading */
+            line-height: 1.8;
+            animation: fadeIn 2s ease-in-out;
+            padding: 10px;
         }
 
-        .large-note {
-            font-size: 3rem; /* Makes it huge */
+        .message-body {
+            font-size: 1.05rem;
+            color: #eee;
+            margin-bottom: 30px;
+            white-space: pre-wrap; /* Keeps your exact line breaks automatically */
+        }
+
+        .signature {
+            text-align: right;
+            color: #ffb7c5;
             font-weight: bold;
-            line-height: 1.2;
-            margin-bottom: 20px;
+            font-size: 1.2rem;
+            margin-top: 20px;
         }
 
-        .back-link {
-            text-decoration: none;
-            opacity: 0.6;
-            transition: opacity 0.3s;
+        .heart-divider {
+            color: #ffb7c5;
+            font-size: 1.5rem;
+            margin: 20px 0;
+            text-align: center;
         }
 
-        .back-link:hover {
-            opacity: 1;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .back-btn-container {
+            margin-top: 40px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-
-    <div class="easter-egg-container">
-        <div class="large-note">
-            You found the secret page! <br>
-            りんかへ、
-
-この一年で、りんかがすごく成長してるのをずっと見てきたよ。
+    <div id="game-container">
+        <div id="letter-container">
+            <h2 style="color: #ffb7c5; margin-bottom: 20px;">りんかへ、</h2>
+            
+            <div class="message-body">この一年で、りんかがすごく成長してるのをずっと見てきたよ。
 9年生のときに初めて会ったとき、きれいだなって思ったけど、まさかこんなふうに彼女になるなんて想像もしてなかった。
 
 でも今は、毎晩一緒にヤッツィーして、毎日会って、お互いのこといっぱい考えてるね。
 ほんとに一緒にいられて幸せだよ。
-
 いつも俺のこと幸せにしてくれてありがとう。
-これからもずっと一緒にいようね。
 
+これからもずっと一緒にいようね。
 大好きだよ。
 これからもヤッツィーいっぱいしようね。
-この秘密を見つけたのも、えらいね。誇りだよ。
 
-スカイより
+この秘密を見つけたのも、えらいね。誇りだよ。</div>
 
+            <div class="heart-divider"> ♡ </div>
+            
+            <div class="signature">スカイより</div>
+
+            <div class="back-btn-container">
+                <a href="../" class="main-btn" style="text-decoration: none; display: inline-block;">← もどる</a>
+            </div>
         </div>
-        <a href="../" class="back-link">← Go back to the main site</a>
     </div>
-
 </body>
 </html>
