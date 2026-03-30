@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You found it!</title>
+    <link rel="stylesheet" href="../style.css">
+    
+    <style>
+        /* Special styles just for this Easter Egg */
+        .easter-egg-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 80vh; 
+            text-align: center;
+            padding: 20px;
+        }
+
+        .large-note {
+            font-size: 3rem; /* Makes it huge */
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+
+        .back-link {
+            text-decoration: none;
+            opacity: 0.6;
+            transition: opacity 0.3s;
+        }
+
+        .back-link:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="easter-egg-container">
+        <div class="large-note">
+            🌟 You found the secret page! <br>
+            This is a special note just for you.
+        </div>
+        <a href="../" class="back-link">← Go back to the main site</a>
+    </div>
+
+</body>
+</html>
