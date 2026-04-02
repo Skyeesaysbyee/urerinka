@@ -27,31 +27,7 @@ body {
     border: 1px solid #222;
 }
 
-.header-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.header-spacer {
-    width: 64px;
-}
-
-.back-btn {
-    background: none;
-    border: none;
-    color: #888;
-    cursor: pointer;
-    font-size: 0.9rem;
-    width: 64px;
-    text-align: left;
-}
-
-.back-btn:hover {
-    color: #ffb7c5;
-}
-
+/* Headings */
 h1 {
     font-size: 1.9rem;
     color: #ffb7c5;
@@ -60,42 +36,96 @@ h1 {
 }
 
 .subtext {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: #888;
-    margin-bottom: 18px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    line-height: 1.5;
 }
 
-.top-info {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+/* Lobby */
+#lobby-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.lobby-box {
+    background: #1a1a1a;
+    border: 1px solid #222;
+    border-radius: 18px;
+    padding: 18px;
+    text-align: left;
+}
+
+.label-text {
+    font-size: 0.82rem;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.label-text:not(:first-child) {
+    margin-top: 12px;
+}
+
+.info-note {
+    margin-top: 6px;
+    background: #1a1a1a;
+    border: 1px solid #222;
+    border-radius: 14px;
+    padding: 12px;
+    color: #aaa;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+/* Header */
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     margin-bottom: 14px;
 }
 
-.info-box {
-    background: #1a1a1a;
-    border: 1px solid #333;
-    border-radius: 14px;
-    padding: 12px;
+.header-center {
+    flex: 1;
     text-align: center;
 }
 
-.info-label {
-    display: block;
-    font-size: 0.78rem;
-    color: #888;
-    margin-bottom: 6px;
+.header-right {
+    min-width: 72px;
+    text-align: right;
+    color: #ffb7c5;
+    font-size: 0.82rem;
+    font-weight: bold;
 }
 
-.info-value {
-    font-size: 1.15rem;
-    font-weight: bold;
+.mini-line {
+    margin-top: 4px;
+    font-size: 0.76rem;
+    color: #888;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.9rem;
+    min-width: 72px;
+    text-align: left;
+}
+
+.back-btn:hover {
     color: #ffb7c5;
 }
 
+/* Inputs */
+input[type="text"],
 input[type="number"] {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     border-radius: 12px;
     border: 1px solid #333;
     background: #1a1a1a;
@@ -105,25 +135,28 @@ input[type="number"] {
     outline: none;
 }
 
+input[type="text"]:focus,
 input[type="number"]:focus {
     border-color: #ffb7c5;
 }
 
+/* Buttons */
 .button-row {
     display: flex;
     gap: 10px;
 }
 
+.button-row button {
+    flex: 1;
+}
+
 .start-row {
+    margin-top: 14px;
     margin-bottom: 14px;
 }
 
 .action-buttons {
     margin-top: 16px;
-}
-
-.button-row button {
-    flex: 1;
 }
 
 .main-btn {
@@ -153,6 +186,18 @@ input[type="number"]:focus {
     transform: none;
 }
 
+/* Waiting + status */
+.waiting-box {
+    margin-bottom: 14px;
+    background: #2a1b1d;
+    border: 1px solid #4a2a30;
+    color: #ffb7c5;
+    border-radius: 14px;
+    padding: 12px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
 #status-box {
     margin-bottom: 16px;
     background: #1a1a1a;
@@ -166,8 +211,39 @@ input[type="number"]:focus {
     display: flex;
     align-items: center;
     justify-content: center;
+    text-align: center;
 }
 
+/* Top info */
+.top-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.info-box {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 14px;
+    padding: 12px;
+    text-align: center;
+}
+
+.info-label {
+    display: block;
+    font-size: 0.78rem;
+    color: #888;
+    margin-bottom: 6px;
+}
+
+.info-value {
+    font-size: 1.15rem;
+    font-weight: bold;
+    color: #ffb7c5;
+}
+
+/* Table area */
 .table-area {
     display: flex;
     flex-direction: column;
@@ -191,7 +267,7 @@ input[type="number"]:focus {
 .player-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     margin-bottom: 10px;
 }
@@ -205,6 +281,7 @@ input[type="number"]:focus {
 .player-header p {
     font-size: 0.82rem;
     color: #888;
+    line-height: 1.4;
 }
 
 .mini-score {
@@ -221,6 +298,7 @@ input[type="number"]:focus {
     font-size: 0.95rem;
 }
 
+/* Cards */
 .cards-row {
     display: flex;
     gap: 8px;
@@ -272,58 +350,4 @@ input[type="number"]:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 0.58rem;
-    letter-spacing: 0.04em;
-}
-
-.result-line {
-    margin-top: 10px;
-    font-size: 0.88rem;
-    font-weight: bold;
-    min-height: 18px;
-}
-
-.result-win {
-    color: #90ee90;
-}
-
-.result-lose {
-    color: #ff8f8f;
-}
-
-.result-push {
-    color: #ffd580;
-}
-
-.dealer-section {
-    margin-top: 2px;
-}
-
-@media (max-width: 430px) {
-    body {
-        padding: 12px;
-        align-items: flex-start;
-    }
-
-    #game-container {
-        padding: 18px;
-        border-radius: 20px;
-    }
-
-    .top-info {
-        grid-template-columns: 1fr;
-    }
-
-    .button-row {
-        flex-direction: column;
-    }
-
-    .cards-row {
-        gap: 6px;
-    }
-
-    .card {
-        width: 42px;
-        height: 62px;
-    }
-}
+   
