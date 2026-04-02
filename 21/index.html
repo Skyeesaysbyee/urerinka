@@ -1,1 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>21 | urerinka</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <div id="game-screen">
+      <h1>21</h1>
+      <p class="subtext">Fake chips only • You vs CPU 1 vs CPU 2 vs Dealer</p>
 
+      <div class="top-info">
+        <div class="info-box">
+          <span class="info-label">Your Chips</span>
+          <span id="player-bank" class="info-value">1000</span>
+        </div>
+
+        <div class="info-box">
+          <span class="info-label">Bet</span>
+          <input type="number" id="bet-input" min="10" step="10" value="50" />
+        </div>
+      </div>
+
+      <div class="button-row top-buttons">
+        <button id="start-round-btn" class="main-btn">Start Round</button>
+        <button id="reset-btn" class="secondary-btn">Reset Chips</button>
+      </div>
+
+      <div id="status-box">Set your bet and start the round.</div>
+
+      <div class="table-area">
+        <div class="player-section dealer-section">
+          <div class="player-header">
+            <div>
+              <h2>Dealer</h2>
+              <p>Score: <span id="dealer-score">0</span></p>
+            </div>
+          </div>
+          <div id="dealer-cards" class="cards-row"></div>
+          <div id="dealer-result" class="result-line"></div>
+        </div>
+
+        <div class="player-section active-turn" id="player-seat">
+          <div class="player-header">
+            <div>
+              <h2>You</h2>
+              <p>Bet: <span id="player-bet">0</span></p>
+            </div>
+            <div class="mini-score">
+              <span id="player-score">0</span>
+            </div>
+          </div>
+          <div id="player-cards" class="cards-row"></div>
+          <div id="player-result" class="result-line"></div>
+        </div>
+
+        <div class="player-section" id="cpu1-seat">
+          <div class="player-header">
+            <div>
+              <h2>CPU 1</h2>
+              <p>Bet: <span id="cpu1-bet">0</span></p>
+            </div>
+            <div class="mini-score">
+              <span id="cpu1-score">0</span>
+            </div>
+          </div>
+          <div id="cpu1-cards" class="cards-row"></div>
+          <div id="cpu1-result" class="result-line"></div>
+        </div>
+
+        <div class="player-section" id="cpu2-seat">
+          <div class="player-header">
+            <div>
+              <h2>CPU 2</h2>
+              <p>Bet: <span id="cpu2-bet">0</span></p>
+            </div>
+            <div class="mini-score">
+              <span id="cpu2-score">0</span>
+            </div>
+          </div>
+          <div id="cpu2-cards" class="cards-row"></div>
+          <div id="cpu2-result" class="result-line"></div>
+        </div>
+      </div>
+
+      <div class="button-row action-buttons">
+        <button id="hit-btn" class="main-btn" disabled>Hit</button>
+        <button id="stand-btn" class="main-btn" disabled>Stand</button>
+        <button id="double-btn" class="main-btn" disabled>Double</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
