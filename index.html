@@ -19,17 +19,20 @@
         <div id="home-hub">
             <h2 style="color: #ffb7c5; margin-bottom: 30px;">りんかのあそびば</h2>
             <div class="menu-grid">
+                
                 <div class="menu-card" onclick="openGame('yahtzee')">
                     <div class="icon">🎲</div>
                     <h3>YAHTZEE</h3>
                     <p>今すぐプレイ</p>
                 </div>
                 
-                <div class="menu-card locked">
+                <!-- 🔥 UPDATED 21 CARD -->
+                <div class="menu-card" onclick="location.href='/21/'">
                     <div class="icon">🃏</div>
                     <h3>21</h3>
-                    <p>もうすぐ...</p>
+                    <p>今すぐプレイ</p>
                 </div>
+
             </div>
         </div>
 
@@ -97,21 +100,6 @@
             </div>
         </div>
 
-        <div id="celeb-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;" onclick="this.style.display='none'">
-            <div class="celeb-content">
-                <h1 style="color: #ffb7c5;">Y A H T Z E E</h1>
-                <p style="color: white; font-size: 1.5em;">すごい！おめでとう！</p>
-            </div>
-        </div>
-
-        <div id="game-over-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; justify-content: center; align-items: center; flex-direction: column;">
-            <div class="celeb-content" style="text-align: center;">
-                <h1 id="game-over-title" style="font-size: 2.5em; margin-bottom: 10px; color: #ffb7c5;"></h1>
-                <p id="game-over-msg" style="color: white; font-size: 1.2em; margin-bottom: 25px;"></p>
-                <button onclick="requestRematch()" class="main-btn" style="width: 100%; max-width: 250px; margin-bottom: 15px;">リマッチ</button>
-                <button onclick="leaveRoom()" style="background: #333; color: white; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer; width: 100%; max-width: 250px;">リーブ</button>
-            </div>
-        </div>
     </div>
 
     <script type="module" src="script.js"></script>
