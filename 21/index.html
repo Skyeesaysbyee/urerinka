@@ -15,14 +15,44 @@
 </head>
 <body>
   <div id="game-container">
-    <div id="game-screen">
-      <div class="header-top">
-        <button class="back-btn" onclick="location.href='/'">← もどる</button>
-        <h1>21</h1>
-        <div class="header-spacer"></div>
+
+    <!-- LOBBY -->
+    <div id="lobby-screen">
+      <button class="back-btn" onclick="location.href='/'">← もどる</button>
+
+      <h1>21</h1>
+      <p class="subtext">ルームを作っていっしょに遊ぼ</p>
+
+      <div class="lobby-box">
+        <p class="label-text">ユーザー名</p>
+        <input type="text" id="username-input" placeholder="なまえ" maxlength="20" />
+
+        <p class="label-text">ルームコード</p>
+        <input type="text" id="room-id-input" placeholder="ルームコード" maxlength="20" />
+
+        <button id="join-btn" class="main-btn">入る</button>
       </div>
 
-      <p class="subtext">あなた vs CPU vs ディーラー</p>
+      <div class="info-note">
+        先に入ったら部屋が作られるよ。<br>
+        あとから入ればそのまま合流できる。
+      </div>
+    </div>
+
+    <!-- GAME -->
+    <div id="game-screen" style="display: none;">
+      <div class="header-top">
+        <button class="back-btn" id="leave-btn">← もどる</button>
+        <div class="header-center">
+          <h1>21</h1>
+          <p id="room-display" class="mini-line"></p>
+        </div>
+        <div class="header-right">
+          <span id="turn-display"></span>
+        </div>
+      </div>
+
+      <div id="waiting-box" class="waiting-box" style="display: none;"></div>
 
       <div class="top-info">
         <div class="info-box">
@@ -32,7 +62,7 @@
 
         <div class="info-box">
           <span class="info-label">ベット</span>
-          <input type="number" id="bet-input" min="10" step="10" value="50" />
+          <input type="number" id="bet-input" min="1" step="1" value="50" />
         </div>
       </div>
 
@@ -40,7 +70,7 @@
         <button id="start-round-btn" class="main-btn">スタート</button>
       </div>
 
-      <div id="status-box">ベットしてスタートしてね。</div>
+      <div id="status-box">部屋に入ってスタートしてね。</div>
 
       <div class="table-area">
         <div class="player-section dealer-section">
@@ -54,7 +84,7 @@
           <div id="dealer-result" class="result-line"></div>
         </div>
 
-        <div class="player-section active-turn" id="player-seat">
+        <div class="player-section" id="player-seat">
           <div class="player-header">
             <div>
               <h2>あなた</h2>
@@ -68,18 +98,21 @@
           <div id="player-result" class="result-line"></div>
         </div>
 
-        <div class="player-section" id="cpu1-seat">
+        <div class="player-section" id="opp-seat">
           <div class="player-header">
             <div>
-              <h2>CPU</h2>
-              <p>ベット: <span id="cpu1-bet">0</span></p>
+              <h2 id="opp-name">あいて</h2>
+              <p>
+                ベット: <span id="opp-bet">0</span><br>
+                チップ: <span id="opp-bank">0</span>
+              </p>
             </div>
             <div class="mini-score">
-              <span id="cpu1-score">0</span>
+              <span id="opp-score">0</span>
             </div>
           </div>
-          <div id="cpu1-cards" class="cards-row"></div>
-          <div id="cpu1-result" class="result-line"></div>
+          <div id="opp-cards" class="cards-row"></div>
+          <div id="opp-result" class="result-line"></div>
         </div>
       </div>
 
@@ -89,8 +122,18 @@
         <button id="double-btn" class="main-btn" disabled>ダブル</button>
       </div>
     </div>
+
+    <!-- GAME OVER -->
+    <div id="game-over-overlay" style="display: none;">
+      <div class="overlay-card">
+        <h1 id="game-over-title"></h1>
+        <p id="game-over-msg"></p>
+        <button id="leave-btn-overlay" class="main-btn" onclick="location.reload()">もどる</button>
+      </div>
+    </div>
+
   </div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
