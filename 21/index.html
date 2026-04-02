@@ -2,15 +2,27 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>21 | urerinka</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>21 | うれりんか</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="../icon.png">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../icon.png">
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="game-container">
     <div id="game-screen">
-      <h1>21</h1>
-      <p class="subtext">フェイクチップだけ • あなた vs CPU vs ディーラー</p>
+      <div class="header-top">
+        <button class="back-btn" onclick="location.href='/'">← もどる</button>
+        <h1>21</h1>
+        <div class="header-spacer"></div>
+      </div>
+
+      <p class="subtext">あなた vs CPU vs ディーラー</p>
 
       <div class="top-info">
         <div class="info-box">
@@ -24,7 +36,7 @@
         </div>
       </div>
 
-      <div class="button-row top-buttons">
+      <div class="button-row start-row">
         <button id="start-round-btn" class="main-btn">スタート</button>
       </div>
 
