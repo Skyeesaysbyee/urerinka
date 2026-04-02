@@ -365,7 +365,7 @@ function renderRoom() {
     const waiting = !roomData.p2 && game.mode === "waiting";
     el.waitingBox.style.display = waiting ? "block" : "none";
     if (waiting) {
-      el.waitingBox.textContent = "相手待ち... ひとりで始めるならスタート押してね。";
+      el.waitingBox.textContent = "ちょっとまって";
     }
   }
 
