@@ -16,12 +16,11 @@
 <body>
   <div id="game-container">
 
-    <!-- LOBBY -->
     <div id="lobby-screen">
       <button class="back-btn" onclick="location.href='/'">← もどる</button>
 
       <h1>21</h1>
-      <p class="subtext">21 ! </p>
+      <p class="subtext">21 !</p>
 
       <div class="lobby-box">
         <p class="label-text">名前</p>
@@ -33,11 +32,9 @@
         <button id="join-btn" class="main-btn">入る</button>
       </div>
 
-      <div class="info-note">
-      </div>
+      <div class="info-note"></div>
     </div>
 
-    <!-- GAME -->
     <div id="game-screen" style="display: none;">
       <div class="header-top">
         <button class="back-btn" id="leave-btn">← もどる</button>
@@ -65,10 +62,11 @@
       </div>
 
       <div class="button-row start-row">
+        <button id="lock-bet-btn" class="main-btn">ベット確定</button>
         <button id="start-round-btn" class="main-btn">スタート</button>
       </div>
 
-      <div id="status-box">部屋に入ってスタートしてね。</div>
+      <div id="status-box">部屋に入ってベットしてね。</div>
 
       <div class="table-area">
         <div class="player-section dealer-section">
@@ -121,7 +119,6 @@
       </div>
     </div>
 
-    <!-- GAME OVER -->
     <div id="game-over-overlay" style="display: none;">
       <div class="overlay-card">
         <h1 id="game-over-title"></h1>
