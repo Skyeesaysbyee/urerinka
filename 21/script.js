@@ -6,7 +6,6 @@ import {
   update,
   get,
   onValue,
-  remove,
   onDisconnect
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
@@ -31,11 +30,11 @@ const STARTING_BANK = 1000;
 
 /* ---------------- STATE ---------------- */
 let currentRoom = null;
-let playerNum = null; // 1 or 2
+let playerNum = null;
 let playerName = "";
 let roomData = null;
-let roomUnsubscribed = false;
-let roomListenerBound = false;
+let cpuLock = false;
+let dealerLock = false;
 
 /* ---------------- DOM ---------------- */
 const el = {
@@ -53,6 +52,7 @@ const el = {
 
   playerBank: document.getElementById("player-bank"),
   betInput: document.getElementById("bet-input"),
+  lockBetBtn: document.getElementById("lock-bet-btn"),
   startRoundBtn: document.getElementById("start-round-btn"),
   hitBtn: document.getElementById("hit-btn"),
   standBtn: document.getElementById("stand-btn"),
@@ -80,10 +80,53 @@ const el = {
   overlay: document.getElementById("game-over-overlay"),
   overlayTitle: document.getElementById("game-over-title"),
   overlayMsg: document.getElementById("game-over-msg"),
+
   leaveBtn: document.getElementById("leave-btn")
 };
 
 /* ---------------- HELPERS ---------------- */
+function myKey() {
+  return playerNum === 1 ? "p1" : "p2";
+}
+
+function oppKey() {
+  return playerNum === 1 ? "p2" : "p1";
+}
+
+function isHost() {
+  return playerNum === 1;
+}
+
+function safeNum(v, fallback = 0) {
+  return Number.isFinite(Number(v)) ? Number(v) : fallback;
+}
+
+function makeSeat(name, bank = STARTING_BANK) {
+  return {
+    name,
+    bank,
+    bet: 0,
+    lockedBet: false,
+    allIn: false,
+    hand: [],
+    done: false,
+    busted: false,
+    stood: false,
+    blackjack: false,
+    result: ""
+  };
+}
+
+function resetSeatRound(seat) {
+  seat.hand = [];
+  seat.done = false;
+  seat.busted = false;
+  seat.stood = false;
+  seat.blackjack = false;
+  seat.result = "";
+  seat.allIn = false;
+}
+
 function makeDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -104,6 +147,7 @@ function shuffle(arr) {
 }
 
 function drawCard(deck, hand) {
+  if (!deck.length) return;
   hand.push(deck.pop());
 }
 
@@ -138,12 +182,10 @@ function isBlackjack(hand) {
 function isSoftHand(hand) {
   let total = 0;
   let aces = 0;
-
   for (const card of hand || []) {
     total += cardValue(card);
     if (card.value === "A") aces++;
   }
-
   return aces > 0 && total <= 21;
 }
 
@@ -158,40 +200,16 @@ function cpuShouldHit(hand, dealerUpCard) {
   return false;
 }
 
-function makeSeat(name, bank = STARTING_BANK) {
-  return {
-    name,
-    bank,
-    bet: 0,
-    hand: [],
-    done: false,
-    busted: false,
-    stood: false,
-    blackjack: false,
-    result: ""
-  };
+function setStatus(text) {
+  el.statusBox.textContent = text || "";
 }
 
-function resetSeatRound(seat) {
-  seat.bet = 0;
-  seat.hand = [];
-  seat.done = false;
-  seat.busted = false;
-  seat.stood = false;
-  seat.blackjack = false;
-  seat.result = "";
-}
-
-function myKey() {
-  return playerNum === 1 ? "p1" : "p2";
-}
-
-function oppKey() {
-  return playerNum === 1 ? "p2" : "p1";
-}
-
-function isHost() {
-  return playerNum === 1;
+function getHighestLockedBet(game) {
+  const bets = [];
+  if (game.p1?.lockedBet) bets.push(game.p1.bet);
+  if (game.mode === "pvp" && game.p2?.lockedBet) bets.push(game.p2.bet);
+  if (game.mode === "cpu" && game.cpu?.lockedBet) bets.push(game.cpu.bet);
+  return bets.length ? Math.max(...bets) : 0;
 }
 
 function getMySeat(game) {
@@ -199,125 +217,22 @@ function getMySeat(game) {
 }
 
 function getOppSeat(game) {
-  if (game.mode === "cpu") return game.cpu;
-  return game[oppKey()];
+  return game.mode === "cpu" ? game.cpu : game[oppKey()];
 }
 
-function currentTurnName(game) {
-  if (!game) return "";
-  if (game.turn === myKey()) return "あなたの番";
-  if (game.turn === oppKey()) return `${getOppSeat(game)?.name || "あいて"}の番`;
-  if (game.turn === "cpu") return "CPUの番";
-  if (game.turn === "dealer") return "ディーラーの番";
-  return "";
-}
-
-function setStatus(text) {
-  if (el.statusBox) el.statusBox.textContent = text;
-}
-
-function safeText(v, fallback = "") {
-  return v == null ? fallback : String(v);
-}
-
-/* ---------------- ROOM SETUP ---------------- */
-async function handleLogin() {
-  playerName = el.usernameInput.value.trim();
-  const code = el.roomInput.value.trim();
-
-  if (!playerName || !code) {
-    alert("名前とコード入れてね。");
-    return;
+function nextTurn(game) {
+  if (game.mode === "pvp") {
+    if (!game.p1.done) return "p1";
+    if (!game.p2.done) return "p2";
+    return "dealer";
   }
-
-  currentRoom = code.toLowerCase();
-  const roomRef = ref(db, `rooms21/${currentRoom}`);
-  const snap = await get(roomRef);
-
-  if (!snap.exists()) {
-    playerNum = 1;
-
-    const room = {
-      p1: { name: playerName, bank: STARTING_BANK, connected: true },
-      p2: null,
-      state: "lobby",
-      host: 1,
-      game: {
-        mode: "waiting",
-        turn: "p1",
-        revealDealer: false,
-        roundActive: false,
-        message: "相手待ち... ひとりで始めるならスタート押してね。",
-        deck: [],
-        dealerHand: [],
-        p1: makeSeat(playerName, STARTING_BANK),
-        p2: makeSeat("Player 2", STARTING_BANK),
-        cpu: makeSeat("CPU", STARTING_BANK)
-      }
-    };
-
-    await set(roomRef, room);
-  } else {
-    const data = snap.val();
-
-    if (!data.p1) {
-      playerNum = 1;
-      await update(roomRef, {
-        p1: { name: playerName, bank: STARTING_BANK, connected: true },
-        host: 1
-      });
-    } else if (!data.p2 && data.state !== "gameover" && data.game?.mode !== "cpu") {
-      playerNum = 2;
-      await update(roomRef, {
-        p2: { name: playerName, bank: STARTING_BANK, connected: true }
-      });
-    } else {
-      alert("このルームは入れないよ。");
-      return;
-    }
-  }
-
-  onDisconnect(ref(db, `rooms21/${currentRoom}/${myKey()}`)).remove();
-
-  el.lobbyScreen.style.display = "none";
-  el.gameScreen.style.display = "block";
-  el.roomDisplay.textContent = `ルーム: ${currentRoom}`;
-
-  bindRoomListener();
+  if (!game.p1.done) return "p1";
+  if (!game.cpu.done) return "cpu";
+  return "dealer";
 }
 
-function bindRoomListener() {
-  if (roomListenerBound) return;
-  roomListenerBound = true;
-
-  onValue(ref(db, `rooms21/${currentRoom}`), (snap) => {
-    const data = snap.val();
-    if (!data) {
-      location.reload();
-      return;
-    }
-
-    roomData = data;
-    renderRoom();
-
-    if (data.state === "gameover") {
-      showGameOver();
-      return;
-    }
-
-    const game = data.game;
-    if (!game) return;
-
-    if (game.mode === "cpu" && isHost() && game.roundActive) {
-      maybeRunCpuOrDealer(game);
-    }
-  });
-}
-
-/* ---------------- RENDER ---------------- */
 function renderCard(card, hidden = false) {
   if (hidden) return `<div class="card back">？？？</div>`;
-
   const red = card.suit === "♥" || card.suit === "♦" ? "red" : "";
   return `
     <div class="card ${red}">
@@ -329,21 +244,15 @@ function renderCard(card, hidden = false) {
 }
 
 function renderHand(target, hand, hideFirst = false) {
-  if (!target) return;
   target.innerHTML = "";
   (hand || []).forEach((card, index) => {
-    target.insertAdjacentHTML(
-      "beforeend",
-      renderCard(card, hideFirst && index === 0)
-    );
+    target.insertAdjacentHTML("beforeend", renderCard(card, hideFirst && index === 0));
   });
 }
 
 function applyResultClass(target, text) {
-  if (!target) return;
   target.textContent = text || "";
   target.className = "result-line";
-
   if (!text) return;
   if (text.includes("勝ち") || text.includes("ブラックジャック")) {
     target.classList.add("result-win");
@@ -354,95 +263,169 @@ function applyResultClass(target, text) {
   }
 }
 
-function renderRoom() {
-  const game = roomData?.game;
-  if (!game) return;
+/* ---------------- ROOM ---------------- */
+async function handleLogin() {
+  playerName = el.usernameInput.value.trim();
+  const roomCode = el.roomInput.value.trim().toLowerCase();
 
-  const mine = getMySeat(game);
-  const opp = getOppSeat(game);
+  if (!playerName || !roomCode) {
+    alert("名前とルームID入れてね。");
+    return;
+  }
 
-  if (el.waitingBox) {
-    const waiting = !roomData.p2 && game.mode === "waiting";
-    el.waitingBox.style.display = waiting ? "block" : "none";
-    if (waiting) {
-      el.waitingBox.textContent = "ちょっとまって";
+  currentRoom = roomCode;
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
+  const snap = await get(roomRef);
+
+  if (!snap.exists()) {
+    playerNum = 1;
+    await set(roomRef, {
+      state: "lobby",
+      winner: null,
+      p1: { name: playerName, bank: STARTING_BANK, connected: true },
+      p2: null,
+      game: {
+        mode: "waiting",
+        roundActive: false,
+        revealDealer: false,
+        turn: "p1",
+        message: "相手待ち。ひとりでやるならベットしてね。",
+        deck: [],
+        dealerHand: [],
+        p1: makeSeat(playerName, STARTING_BANK),
+        p2: makeSeat("Player 2", STARTING_BANK),
+        cpu: makeSeat("CPU", STARTING_BANK)
+      }
+    });
+  } else {
+    const data = snap.val();
+    if (!data.p2 && data.game?.mode !== "cpu" && data.state !== "gameover") {
+      playerNum = 2;
+      await update(roomRef, {
+        p2: { name: playerName, bank: STARTING_BANK, connected: true },
+        "game/p2/name": playerName
+      });
+    } else {
+      alert("そのルーム入れないよ。");
+      return;
     }
   }
 
+  onDisconnect(ref(db, `rooms21/${currentRoom}/${myKey()}`)).remove();
+
+  el.lobbyScreen.style.display = "none";
+  el.gameScreen.style.display = "block";
+  bindRoomListener();
+}
+
+function bindRoomListener() {
+  onValue(ref(db, `rooms21/${currentRoom}`), (snap) => {
+    const data = snap.val();
+    if (!data) {
+      location.reload();
+      return;
+    }
+    roomData = data;
+    renderRoom();
+
+    if (data.state === "gameover") {
+      showGameOver();
+      return;
+    }
+
+    if (isHost()) {
+      maybeRunCpu();
+      maybeRunDealer();
+    }
+  });
+}
+
+/* ---------------- RENDER ---------------- */
+function renderRoom() {
+  const game = roomData.game;
+  const me = getMySeat(game);
+  const opp = getOppSeat(game);
+
+  el.roomDisplay.textContent = `ルーム: ${currentRoom}`;
+
+  if (!roomData.p2 && game.mode === "waiting") {
+    el.waitingBox.style.display = "block";
+    el.waitingBox.textContent = "相手待ち。ひとりでやるならベットしてスタート。";
+  } else {
+    el.waitingBox.style.display = "none";
+  }
+
+  el.turnDisplay.textContent =
+    game.turn === myKey() ? "あなたの番" :
+    game.turn === "dealer" ? "ディーラーの番" :
+    game.turn === "cpu" ? "CPUの番" :
+    `${opp?.name || "あいて"}の番`;
+
   setStatus(game.message || "");
 
-  el.turnDisplay.textContent = currentTurnName(game);
+  el.playerBank.textContent = me?.bank ?? 0;
+  el.playerBet.textContent = me?.bet ?? 0;
+  el.playerScore.textContent = me?.hand?.length ? scoreHand(me.hand) : 0;
 
-  el.playerBank.textContent = safeText(mine?.bank, "0");
-  el.playerBet.textContent = safeText(mine?.bet, "0");
-  el.playerScore.textContent = mine?.hand?.length ? scoreHand(mine.hand) : 0;
+  el.oppName.textContent = opp?.name || (game.mode === "cpu" ? "CPU" : "あいて");
+  el.oppBank.textContent = opp?.bank ?? 0;
+  el.oppBet.textContent = opp?.bet ?? 0;
+  el.oppScore.textContent = opp?.hand?.length ? scoreHand(opp.hand) : 0;
 
-  if (el.oppName) el.oppName.textContent = opp?.name || (game.mode === "cpu" ? "CPU" : "あいて");
-  if (el.oppBank) el.oppBank.textContent = safeText(opp?.bank, "0");
-  if (el.oppBet) el.oppBet.textContent = safeText(opp?.bet, "0");
-  if (el.oppScore) el.oppScore.textContent = opp?.hand?.length ? scoreHand(opp.hand) : 0;
-
-  renderHand(el.playerCards, mine?.hand || []);
+  renderHand(el.playerCards, me?.hand || []);
   renderHand(el.oppCards, opp?.hand || []);
   renderHand(el.dealerCards, game.dealerHand || [], !game.revealDealer);
 
-  const dealerScore = game.revealDealer
+  el.dealerScore.textContent = game.revealDealer
     ? scoreHand(game.dealerHand || [])
     : (game.dealerHand?.[1] ? cardValue(game.dealerHand[1]) : 0);
 
-  el.dealerScore.textContent = dealerScore;
-
-  applyResultClass(el.playerResult, mine?.result || "");
+  applyResultClass(el.playerResult, me?.result || "");
   applyResultClass(el.oppResult, opp?.result || "");
-  applyResultClass(
-    el.dealerResult,
-    game.revealDealer ? `最終: ${scoreHand(game.dealerHand || [])}` : ""
-  );
+  applyResultClass(el.dealerResult, game.revealDealer ? `最終: ${scoreHand(game.dealerHand || [])}` : "");
 
-  el.startRoundBtn.disabled = false;
-  el.hitBtn.disabled = !(game.roundActive && game.turn === myKey() && !mine.done);
-  el.standBtn.disabled = !(game.roundActive && game.turn === myKey() && !mine.done);
-  el.doubleBtn.disabled = !(
-    game.roundActive &&
-    game.turn === myKey() &&
-    !mine.done &&
-    mine.hand.length === 2 &&
-    mine.bank >= mine.bet
-  );
+  el.playerSeat.classList.remove("active-turn");
+  el.oppSeat.classList.remove("active-turn");
 
-  el.playerSeat?.classList.remove("active-turn");
-  el.oppSeat?.classList.remove("active-turn");
+  if (game.turn === myKey()) el.playerSeat.classList.add("active-turn");
+  if (game.turn === oppKey() || game.turn === "cpu") el.oppSeat.classList.add("active-turn");
 
-  if (game.turn === myKey()) el.playerSeat?.classList.add("active-turn");
-  if (game.turn === oppKey() || game.turn === "cpu") el.oppSeat?.classList.add("active-turn");
+  const highestBet = getHighestLockedBet(game);
+  const myBet = me?.bet || 0;
+  const myCanAct = game.roundActive && game.turn === myKey() && !me.done;
 
-  if (game.roundActive) {
-    el.startRoundBtn.textContent = "進行中";
-    el.startRoundBtn.disabled = true;
+  el.hitBtn.disabled = !myCanAct;
+  el.standBtn.disabled = !myCanAct;
+  el.doubleBtn.disabled = !myCanAct || me.hand.length !== 2 || me.bank < me.bet;
+
+  el.lockBetBtn.disabled = game.roundActive;
+  el.startRoundBtn.disabled = game.roundActive;
+
+  if (!game.roundActive) {
+    if (highestBet > 0 && myBet < highestBet && !(me.allIn && myBet < highestBet)) {
+      el.startRoundBtn.textContent = `最高ベット ${highestBet}`;
+    } else {
+      el.startRoundBtn.textContent = "スタート";
+    }
   } else {
-    el.startRoundBtn.textContent = roomData.p2 ? "ベットして開始" : "スタート";
-    el.startRoundBtn.disabled = false;
+    el.startRoundBtn.textContent = "進行中";
   }
 }
 
-/* ---------------- START ROUND ---------------- */
-async function startRound() {
-  if (!roomData || !roomData.game || roomData.state === "gameover") return;
-  if (roomData.game.roundActive) return;
+/* ---------------- BET LOCK ---------------- */
+async function lockBet() {
+  if (!roomData || roomData.game.roundActive) return;
 
   const roomRef = ref(db, `rooms21/${currentRoom}`);
   const snap = await get(roomRef);
   const data = snap.val();
   if (!data) return;
 
-  const game = data.game;
-  const roomHasP2 = !!data.p2;
-  const mode = roomHasP2 ? "pvp" : "cpu";
-
+  const game = structuredClone(data.game);
   const me = game[myKey()];
-  const bet = Number(el.betInput.value);
+  let bet = safeNum(el.betInput.value, 0);
 
-  if (!Number.isFinite(bet) || bet < 1) {
+  if (bet < 1) {
     setStatus("1以上ベットしてね。");
     return;
   }
@@ -452,122 +435,156 @@ async function startRound() {
     return;
   }
 
-  if (mode === "pvp" && !data.p2) {
-    setStatus("まだ相手いないよ。");
+  const currentHighest = getHighestLockedBet(game);
+
+  me.allIn = false;
+
+  if (currentHighest > 0 && bet < currentHighest) {
+    if (me.bank < currentHighest && bet === me.bank) {
+      me.bet = me.bank;
+      me.lockedBet = true;
+      me.allIn = true;
+    } else {
+      setStatus(`最高ベットは${currentHighest}。同じ額まで上げてね。`);
+      return;
+    }
+  } else {
+    me.bet = bet;
+    me.lockedBet = true;
+  }
+
+  if (!data.p2) {
+    game.mode = "cpu";
+    game.cpu.bet = Math.min(game.cpu.bank, Math.max(10, me.bet));
+    game.cpu.lockedBet = true;
+    game.cpu.allIn = game.cpu.bet === game.cpu.bank;
+    game.cpu.name = "CPU";
+    game.message = `ベット確定。CPUは${game.cpu.bet}。`;
+  } else {
+    game.mode = "pvp";
+    const highestBet = getHighestLockedBet(game);
+
+    if (game.p1.lockedBet && game.p2.lockedBet) {
+      const p1CanCover = game.p1.bet === highestBet || (game.p1.allIn && game.p1.bet < highestBet);
+      const p2CanCover = game.p2.bet === highestBet || (game.p2.allIn && game.p2.bet < highestBet);
+
+      if (p1CanCover && p2CanCover) {
+        if (game.p1.allIn || game.p2.allIn) {
+          game.message = "オールインあり。スタートできるよ。";
+        } else {
+          game.message = "ベットそろった。スタートできるよ。";
+        }
+      } else {
+        game.message = `最高ベットは${highestBet}。合わせてね。`;
+      }
+    } else {
+      game.message = me.allIn ? "オールインでベット確定。相手待ち。" : "ベット確定。相手待ち。";
+    }
+  }
+
+  await update(roomRef, { game });
+}
+
+/* ---------------- START ROUND ---------------- */
+async function startRound() {
+  if (!roomData || roomData.game.roundActive) return;
+
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (!data) return;
+
+  const game = structuredClone(data.game);
+  const hasP2 = !!data.p2;
+
+  if (!game.p1.lockedBet) {
+    setStatus("先にベット確定してね。");
     return;
+  }
+
+  if (hasP2) {
+    game.mode = "pvp";
+
+    if (!game.p2.lockedBet) {
+      setStatus("相手のベット待ち。");
+      return;
+    }
+
+    const highestBet = Math.max(game.p1.bet, game.p2.bet);
+    const p1Matched = game.p1.bet === highestBet || (game.p1.allIn && game.p1.bet < highestBet);
+    const p2Matched = game.p2.bet === highestBet || (game.p2.allIn && game.p2.bet < highestBet);
+
+    if (!p1Matched || !p2Matched) {
+      setStatus(`最高ベットは${highestBet}。合わせてね。`);
+      return;
+    }
+
+    if (!isHost()) {
+      setStatus("ホストがスタートするよ。");
+      return;
+    }
+  } else {
+    game.mode = "cpu";
+    if (!game.cpu.lockedBet) {
+      game.cpu.bet = Math.min(game.cpu.bank, Math.max(10, game.p1.bet));
+      game.cpu.lockedBet = true;
+      game.cpu.allIn = game.cpu.bet === game.cpu.bank;
+    }
   }
 
   const deck = makeDeck();
 
-  const p1 = game.p1 || makeSeat(data.p1?.name || "P1", data.p1?.bank ?? STARTING_BANK);
-  const p2 = game.p2 || makeSeat(data.p2?.name || "P2", data.p2?.bank ?? STARTING_BANK);
-  const cpu = game.cpu || makeSeat("CPU", STARTING_BANK);
+  resetSeatRound(game.p1);
+  resetSeatRound(game.p2);
+  resetSeatRound(game.cpu);
 
-  resetSeatRound(p1);
-  resetSeatRound(p2);
-  resetSeatRound(cpu);
+  game.dealerHand = [];
+  game.revealDealer = false;
+  game.roundActive = true;
 
-  p1.name = data.p1?.name || p1.name;
-  p1.bank = data.p1?.bank ?? p1.bank;
-
-  p2.name = data.p2?.name || p2.name;
-  p2.bank = data.p2?.bank ?? p2.bank;
-
-  if (mode === "pvp") {
-    p1.bet = playerNum === 1 ? bet : Math.min(p1.bank, game.p1?.bet || 10);
-    p2.bet = playerNum === 2 ? bet : Math.min(p2.bank, game.p2?.bet || 10);
-
-    if (playerNum === 1 && (game.p2?.bet || 0) > 0) p2.bet = Math.min(p2.bank, game.p2.bet);
-    if (playerNum === 2 && (game.p1?.bet || 0) > 0) p1.bet = Math.min(p1.bank, game.p1.bet);
-
-    if (playerNum === 1) {
-      p1.bet = bet;
-      await update(roomRef, { [`game/p1/bet`]: bet, [`game/message`]: "相手のベット待ち..." });
-      if (!game.p2?.bet) return;
-      p2.bet = Math.min(p2.bank, game.p2.bet);
-    } else {
-      p2.bet = bet;
-      await update(roomRef, { [`game/p2/bet`]: bet, [`game/message`]: "ホストが開始するの待ち..." });
-      if (!game.p1?.bet) return;
-      p1.bet = Math.min(p1.bank, game.p1.bet);
-    }
-
-    if (!isHost()) return;
+  game.p1.bank -= game.p1.bet;
+  if (game.mode === "pvp") {
+    game.p2.bank -= game.p2.bet;
   } else {
-    p1.bet = bet;
-    cpu.bet = Math.min(cpu.bank, Math.max(10, randomCpuBet(bet)));
+    game.cpu.bank -= game.cpu.bet;
   }
 
-  if (mode === "pvp") {
-    if (p1.bet > p1.bank || p2.bet > p2.bank) {
-      setStatus("どっちかのベットが所持金オーバー。");
-      return;
-    }
-  } else {
-    if (p1.bet > p1.bank) {
-      setStatus(`いまは${p1.bank}までしかベットできないよ。`);
-      return;
-    }
-  }
+  drawCard(deck, game.p1.hand);
+  if (game.mode === "pvp") drawCard(deck, game.p2.hand);
+  else drawCard(deck, game.cpu.hand);
+  drawCard(deck, game.dealerHand);
 
-  p1.bank -= p1.bet;
-  if (mode === "pvp") p2.bank -= p2.bet;
-  if (mode === "cpu") cpu.bank -= cpu.bet;
+  drawCard(deck, game.p1.hand);
+  if (game.mode === "pvp") drawCard(deck, game.p2.hand);
+  else drawCard(deck, game.cpu.hand);
+  drawCard(deck, game.dealerHand);
 
-  const dealerHand = [];
+  game.p1.blackjack = isBlackjack(game.p1.hand);
+  game.p2.blackjack = isBlackjack(game.p2.hand);
+  game.cpu.blackjack = isBlackjack(game.cpu.hand);
 
-  drawCard(deck, p1.hand);
-  if (mode === "pvp") drawCard(deck, p2.hand);
-  if (mode === "cpu") drawCard(deck, cpu.hand);
-  drawCard(deck, dealerHand);
+  game.p1.done = game.p1.blackjack;
+  game.p2.done = game.p2.blackjack;
+  game.cpu.done = game.cpu.blackjack;
 
-  drawCard(deck, p1.hand);
-  if (mode === "pvp") drawCard(deck, p2.hand);
-  if (mode === "cpu") drawCard(deck, cpu.hand);
-  drawCard(deck, dealerHand);
-
-  p1.blackjack = isBlackjack(p1.hand);
-  p2.blackjack = isBlackjack(p2.hand);
-  cpu.blackjack = isBlackjack(cpu.hand);
-
-  p1.done = p1.blackjack;
-  p2.done = p2.blackjack;
-  cpu.done = cpu.blackjack;
-
-  const firstTurn = p1.blackjack ? (mode === "pvp" ? "p2" : "cpu") : "p1";
-
-  const newGame = {
-    mode,
-    turn: firstTurn,
-    revealDealer: false,
-    roundActive: true,
-    message: firstTurn === "p1" ? "あなたの番。" : `${mode === "pvp" ? p2.name : "CPU"}の番。`,
-    deck,
-    dealerHand,
-    p1,
-    p2,
-    cpu
-  };
+  game.turn = nextTurn(game);
+  game.deck = deck;
+  game.message = game.turn === "p1" ? "あなたの番。" : "進行中。";
 
   await update(roomRef, {
-    state: "playing",
-    p1: { ...data.p1, bank: p1.bank },
-    p2: data.p2 ? { ...data.p2, bank: p2.bank } : null,
-    game: newGame
+    game,
+    p1: { ...data.p1, bank: game.p1.bank },
+    p2: data.p2 ? { ...data.p2, bank: game.p2.bank } : null,
+    state: "playing"
   });
-
-  if (mode === "cpu" && isHost()) maybeRunCpuOrDealer(newGame);
-}
-
-function randomCpuBet(base) {
-  const opts = [base, base, base + 10, base - 10, base + 20];
-  return Math.max(10, opts[Math.floor(Math.random() * opts.length)]);
 }
 
 /* ---------------- PLAYER ACTIONS ---------------- */
 async function playerHit() {
   if (!roomData?.game?.roundActive) return;
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
   const game = structuredClone(roomData.game);
+
   if (game.turn !== myKey()) return;
 
   const me = game[myKey()];
@@ -578,46 +595,45 @@ async function playerHit() {
     me.busted = true;
     me.done = true;
     me.result = "バースト";
-    game.message = "バースト...";
     game.turn = nextTurn(game);
+    game.message = "バースト…。";
   } else if (score === 21) {
     me.done = true;
     me.stood = true;
-    game.message = "21きた！";
     game.turn = nextTurn(game);
+    game.message = "21きた！";
   } else {
     game.message = "ヒット。";
   }
 
-  await update(ref(db, `rooms21/${currentRoom}`), { game });
-
-  if (isHost()) maybeRunCpuOrDealer(game);
+  await update(roomRef, { game });
 }
 
 async function playerStand() {
   if (!roomData?.game?.roundActive) return;
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
   const game = structuredClone(roomData.game);
+
   if (game.turn !== myKey()) return;
 
   const me = game[myKey()];
   me.done = true;
   me.stood = true;
-  game.message = "スタンド。";
   game.turn = nextTurn(game);
+  game.message = "スタンド。";
 
-  await update(ref(db, `rooms21/${currentRoom}`), { game });
-
-  if (isHost()) maybeRunCpuOrDealer(game);
+  await update(roomRef, { game });
 }
 
 async function playerDouble() {
   if (!roomData?.game?.roundActive) return;
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
   const game = structuredClone(roomData.game);
+
   if (game.turn !== myKey()) return;
 
   const me = game[myKey()];
   if (me.hand.length !== 2) return;
-
   if (me.bank < me.bet) {
     setStatus("ダブルするお金が足りないよ。");
     return;
@@ -626,12 +642,6 @@ async function playerDouble() {
   me.bank -= me.bet;
   me.bet *= 2;
 
-  if (myKey() === "p1") {
-    roomData.p1.bank = me.bank;
-  } else {
-    roomData.p2.bank = me.bank;
-  }
-
   drawCard(game.deck, me.hand);
 
   const score = scoreHand(me.hand);
@@ -642,121 +652,128 @@ async function playerDouble() {
     me.stood = true;
   }
   me.done = true;
-
-  game.message = "ダブル！";
   game.turn = nextTurn(game);
+  game.message = "ダブル！";
 
   const patch = { game };
   patch[myKey()] = { ...(roomData[myKey()] || {}), bank: me.bank };
 
-  await update(ref(db, `rooms21/${currentRoom}`), patch);
-
-  if (isHost()) maybeRunCpuOrDealer(game);
+  await update(roomRef, patch);
 }
 
-function nextTurn(game) {
-  if (game.mode === "pvp") {
-    if (!game.p1.done) return "p1";
-    if (!game.p2.done) return "p2";
-    return "dealer";
-  }
+/* ---------------- CPU ---------------- */
+async function maybeRunCpu() {
+  if (!isHost() || cpuLock || !roomData?.game?.roundActive) return;
+  const game = roomData.game;
 
-  if (!game.p1.done) return "p1";
-  if (!game.cpu.done) return "cpu";
-  return "dealer";
-}
+  if (game.mode !== "cpu" || game.turn !== "cpu" || game.cpu.done) return;
 
-/* ---------------- CPU / DEALER ---------------- */
-let actionLock = false;
+  cpuLock = true;
 
-async function maybeRunCpuOrDealer(game) {
-  if (actionLock || !isHost()) return;
-  if (!game.roundActive) return;
+  setTimeout(async () => {
+    const roomRef = ref(db, `rooms21/${currentRoom}`);
+    const snap = await get(roomRef);
+    const fresh = snap.val();
+    if (!fresh?.game || fresh.game.turn !== "cpu") {
+      cpuLock = false;
+      return;
+    }
 
-  if (game.mode === "cpu" && game.turn === "cpu" && !game.cpu.done) {
-    actionLock = true;
-    setTimeout(async () => {
-      const latest = structuredClone(roomData.game);
-      if (!latest || latest.turn !== "cpu") {
-        actionLock = false;
-        return;
-      }
+    const g = structuredClone(fresh.game);
+    const cpu = g.cpu;
+    const dealerUp = g.dealerHand[1];
 
-      const cpu = latest.cpu;
-      const dealerUp = latest.dealerHand?.[1];
-      const shouldHit = cpuShouldHit(cpu.hand, dealerUp);
-
-      if (shouldHit) {
-        drawCard(latest.deck, cpu.hand);
-        if (scoreHand(cpu.hand) > 21) {
-          cpu.busted = true;
-          cpu.done = true;
-          cpu.result = "バースト";
-          latest.message = "CPU、バースト。";
-          latest.turn = nextTurn(latest);
-        } else {
-          latest.message = "CPUはヒット。";
-        }
-      } else {
+    if (cpuShouldHit(cpu.hand, dealerUp)) {
+      drawCard(g.deck, cpu.hand);
+      if (scoreHand(cpu.hand) > 21) {
+        cpu.busted = true;
         cpu.done = true;
-        cpu.stood = true;
-        latest.message = "CPUはスタンド。";
-        latest.turn = nextTurn(latest);
+        cpu.result = "バースト";
+        g.turn = nextTurn(g);
+        g.message = "CPU、バースト。";
+      } else {
+        g.message = "CPUはヒット。";
       }
+    } else {
+      cpu.done = true;
+      cpu.stood = true;
+      g.turn = nextTurn(g);
+      g.message = "CPUはスタンド。";
+    }
 
-      await update(ref(db, `rooms21/${currentRoom}`), { game: latest });
-      actionLock = false;
-      maybeRunCpuOrDealer(latest);
-    }, 900);
+    await update(roomRef, { game: g });
+    cpuLock = false;
+    maybeRunDealer();
+    maybeRunCpu();
+  }, 900);
+}
+
+/* ---------------- DEALER ---------------- */
+async function maybeRunDealer() {
+  if (!isHost() || dealerLock || !roomData?.game?.roundActive) return;
+  const game = roomData.game;
+  if (game.turn !== "dealer") return;
+
+  dealerLock = true;
+
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
+  const snap = await get(roomRef);
+  const fresh = snap.val();
+  if (!fresh?.game || fresh.game.turn !== "dealer") {
+    dealerLock = false;
     return;
   }
 
-  if (game.turn === "dealer") {
-    actionLock = true;
-    setTimeout(async () => {
-      const latest = structuredClone(roomData.game);
-      if (!latest || latest.turn !== "dealer") {
-        actionLock = false;
-        return;
-      }
+  let g = structuredClone(fresh.game);
+  g.revealDealer = true;
+  await update(roomRef, { game: g });
 
-      latest.revealDealer = true;
+  const everyoneBusted = g.mode === "pvp"
+    ? g.p1.busted && g.p2.busted
+    : g.p1.busted && g.cpu.busted;
 
-      const playerSet = latest.mode === "pvp" ? [latest.p1, latest.p2] : [latest.p1, latest.cpu];
-      const everybodyBusted = playerSet.every(s => s.busted);
-
-      if (everybodyBusted) {
-        await finalizeRound(latest);
-        actionLock = false;
-        return;
-      }
-
-      const dealerScore = scoreHand(latest.dealerHand);
-
-      if (dealerScore < 17) {
-        drawCard(latest.deck, latest.dealerHand);
-        latest.message = "ディーラーはヒット。";
-        await update(ref(db, `rooms21/${currentRoom}`), { game: latest });
-        actionLock = false;
-        maybeRunCpuOrDealer(latest);
-      } else {
-        latest.message = "ディーラーはスタンド。";
-        await finalizeRound(latest);
-        actionLock = false;
-      }
-    }, 900);
+  if (everyoneBusted) {
+    await finalizeRound(g);
+    dealerLock = false;
+    return;
   }
+
+  const runDealerStep = async () => {
+    const snap2 = await get(roomRef);
+    const current = snap2.val();
+    if (!current?.game) {
+      dealerLock = false;
+      return;
+    }
+
+    g = structuredClone(current.game);
+    const dealerScore = scoreHand(g.dealerHand);
+
+    if (dealerScore < 17) {
+      drawCard(g.deck, g.dealerHand);
+      g.message = "ディーラーはヒット。";
+      await update(roomRef, { game: g });
+      setTimeout(runDealerStep, 900);
+    } else {
+      g.message = "ディーラーはスタンド。";
+      await finalizeRound(g);
+      dealerLock = false;
+    }
+  };
+
+  setTimeout(runDealerStep, 900);
 }
 
 /* ---------------- ROUND END ---------------- */
 async function finalizeRound(game) {
+  const roomRef = ref(db, `rooms21/${currentRoom}`);
   const dealerScore = scoreHand(game.dealerHand);
   const dealerBJ = isBlackjack(game.dealerHand);
   const dealerBust = dealerScore > 21;
 
-  const seats = game.mode === "pvp" ? ["p1", "p2"] : ["p1", "cpu"];
+  const keys = game.mode === "pvp" ? ["p1", "p2"] : ["p1", "cpu"];
 
-  for (const key of seats) {
+  for (const key of keys) {
     const seat = game[key];
     const score = scoreHand(seat.hand);
 
@@ -799,64 +816,56 @@ async function finalizeRound(game) {
     ? `ディーラーが${dealerScore}でバースト。`
     : `ディーラーは${dealerScore}で終了。`;
 
-  const patch = { game };
+  game.turn = "p1";
+  game.p1.lockedBet = false;
+  game.p2.lockedBet = false;
+  game.cpu.lockedBet = false;
 
-  patch.p1 = { ...(roomData.p1 || {}), bank: game.p1.bank };
-  if (roomData.p2) patch.p2 = { ...(roomData.p2 || {}), bank: game.p2.bank };
-
-  let overallWinner = null;
+  let winner = null;
 
   if (game.mode === "pvp") {
-    if (game.p1.bank <= 0) overallWinner = "p2";
-    if (game.p2.bank <= 0) overallWinner = "p1";
+    const p1LostRound = game.p1.result === "負け" || game.p1.result === "バースト";
+    const p2LostRound = game.p2.result === "負け" || game.p2.result === "バースト";
+
+    if (game.p1.bank <= 0 && p1LostRound) winner = "p2";
+    if (game.p2.bank <= 0 && p2LostRound) winner = "p1";
   } else {
-    if (game.p1.bank <= 0) {
-      if (!game.cpu.busted && scoreHand(game.cpu.hand) >= 0) {
-        overallWinner = "cpu";
-      } else {
-        overallWinner = "dealer";
-      }
+    const p1LostRound = game.p1.result === "負け" || game.p1.result === "バースト";
+    if (game.p1.bank <= 0 && p1LostRound) {
+      const cpuScore = scoreHand(game.cpu.hand);
+      if (!game.cpu.busted && cpuScore >= 0) winner = "cpu";
+      else winner = "dealer";
     }
   }
 
-  if (overallWinner) {
+  const patch = {
+    game,
+    p1: { ...(roomData.p1 || {}), bank: game.p1.bank },
+    p2: roomData.p2 ? { ...(roomData.p2 || {}), bank: game.p2.bank } : null
+  };
+
+  if (winner) {
     patch.state = "gameover";
-    patch.winner = overallWinner;
+    patch.winner = winner;
   }
 
-  await update(ref(db, `rooms21/${currentRoom}`), patch);
+  await update(roomRef, patch);
 }
 
 /* ---------------- GAME OVER ---------------- */
 function showGameOver() {
-  if (!roomData) return;
-
   const winner = roomData.winner;
   const iWon = winner === myKey();
 
   let title = iWon ? "かち！" : "まけ...";
-  let msg = "";
-
   if (iWon && playerName === "りんかちゃん") {
     title = "大好きだよママ";
   }
-
-  if (winner === "cpu") {
-    title = "CPUのかち";
-  } else if (winner === "dealer") {
-    title = "ディーラーのかち";
-  }
+  if (winner === "cpu") title = "CPUのかち";
+  if (winner === "dealer") title = "ディーラーのかち";
 
   const myBank = roomData.game?.[myKey()]?.bank ?? 0;
-  const opp = getOppSeat(roomData.game);
-
-  if (winner === "p1" || winner === "p2") {
-    msg = `${roomData[winner]?.name || "勝者"} が勝ったよ。あなたの所持金: ${myBank}`;
-  } else if (winner === "cpu") {
-    msg = `CPUにやられた... あなたの所持金: ${myBank}`;
-  } else {
-    msg = `ディーラーの勝ち。あなたの所持金: ${myBank}`;
-  }
+  const msg = `あなたの所持金: ${myBank}`;
 
   el.overlayTitle.textContent = title;
   el.overlayMsg.textContent = msg;
@@ -869,17 +878,17 @@ function leaveRoom() {
 }
 
 /* ---------------- EVENTS ---------------- */
-el.joinBtn?.addEventListener("click", handleLogin);
-el.startRoundBtn?.addEventListener("click", startRound);
-el.hitBtn?.addEventListener("click", playerHit);
-el.standBtn?.addEventListener("click", playerStand);
-el.doubleBtn?.addEventListener("click", playerDouble);
-el.leaveBtn?.addEventListener("click", leaveRoom);
+el.joinBtn.addEventListener("click", handleLogin);
+el.lockBetBtn.addEventListener("click", lockBet);
+el.startRoundBtn.addEventListener("click", startRound);
+el.hitBtn.addEventListener("click", playerHit);
+el.standBtn.addEventListener("click", playerStand);
+el.doubleBtn.addEventListener("click", playerDouble);
+el.leaveBtn.addEventListener("click", leaveRoom);
 
-/* enter key */
-el.roomInput?.addEventListener("keydown", (e) => {
+el.usernameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") handleLogin();
 });
-el.usernameInput?.addEventListener("keydown", (e) => {
+el.roomInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") handleLogin();
 });
