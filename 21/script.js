@@ -402,7 +402,9 @@ function renderRoom() {
   el.startRoundBtn.disabled = game.roundActive;
 
   if (!game.roundActive) {
-    if (highestBet > 0 && myBet < highestBet && !(me.allIn && myBet < highestBet)) {
+    if (!roomData.p2) {
+      el.startRoundBtn.textContent = "スタート";
+    } else if (highestBet > 0 && myBet < highestBet && !(me.allIn && myBet < highestBet)) {
       el.startRoundBtn.textContent = `最高ベット ${highestBet}`;
     } else {
       el.startRoundBtn.textContent = "スタート";
@@ -435,32 +437,24 @@ async function lockBet() {
     return;
   }
 
+  me.allIn = false;
   const currentHighest = getHighestLockedBet(game);
 
-  me.allIn = false;
-
-  if (currentHighest > 0 && bet < currentHighest) {
-    if (me.bank < currentHighest && bet === me.bank) {
-      me.bet = me.bank;
-      me.lockedBet = true;
-      me.allIn = true;
+  if (data.p2) {
+    if (currentHighest > 0 && bet < currentHighest) {
+      if (me.bank < currentHighest && bet === me.bank) {
+        me.bet = me.bank;
+        me.lockedBet = true;
+        me.allIn = true;
+      } else {
+        setStatus(`最高ベットは${currentHighest}。同じ額まで上げてね。`);
+        return;
+      }
     } else {
-      setStatus(`最高ベットは${currentHighest}。同じ額まで上げてね。`);
-      return;
+      me.bet = bet;
+      me.lockedBet = true;
     }
-  } else {
-    me.bet = bet;
-    me.lockedBet = true;
-  }
 
-  if (!data.p2) {
-    game.mode = "cpu";
-    game.cpu.bet = Math.min(game.cpu.bank, Math.max(10, me.bet));
-    game.cpu.lockedBet = true;
-    game.cpu.allIn = game.cpu.bet === game.cpu.bank;
-    game.cpu.name = "CPU";
-    game.message = `ベット確定。CPUは${game.cpu.bet}。`;
-  } else {
     game.mode = "pvp";
     const highestBet = getHighestLockedBet(game);
 
@@ -469,17 +463,26 @@ async function lockBet() {
       const p2CanCover = game.p2.bet === highestBet || (game.p2.allIn && game.p2.bet < highestBet);
 
       if (p1CanCover && p2CanCover) {
-        if (game.p1.allIn || game.p2.allIn) {
-          game.message = "オールインあり。スタートできるよ。";
-        } else {
-          game.message = "ベットそろった。スタートできるよ。";
-        }
+        game.message = (game.p1.allIn || game.p2.allIn)
+          ? "オールインあり。スタートできるよ。"
+          : "ベットそろった。スタートできるよ。";
       } else {
         game.message = `最高ベットは${highestBet}。合わせてね。`;
       }
     } else {
       game.message = me.allIn ? "オールインでベット確定。相手待ち。" : "ベット確定。相手待ち。";
     }
+  } else {
+    me.bet = bet;
+    me.lockedBet = true;
+    me.allIn = bet === me.bank;
+
+    game.mode = "cpu";
+    game.cpu.name = "CPU";
+    game.cpu.bet = Math.min(game.cpu.bank, me.bet);
+    game.cpu.lockedBet = true;
+    game.cpu.allIn = game.cpu.bet === game.cpu.bank;
+    game.message = `ベット確定。CPUは${game.cpu.bet}。スタートしてね。`;
   }
 
   await update(roomRef, { game });
@@ -502,7 +505,19 @@ async function startRound() {
     return;
   }
 
-  if (hasP2) {
+  if (!hasP2) {
+    game.mode = "cpu";
+    game.cpu.name = "CPU";
+    game.cpu.lockedBet = true;
+
+    if (!game.cpu.bet || game.cpu.bet < 1) {
+      game.cpu.bet = Math.min(game.cpu.bank, Math.max(10, game.p1.bet));
+    } else {
+      game.cpu.bet = Math.min(game.cpu.bank, game.p1.bet);
+    }
+
+    game.cpu.allIn = game.cpu.bet === game.cpu.bank;
+  } else {
     game.mode = "pvp";
 
     if (!game.p2.lockedBet) {
@@ -522,13 +537,6 @@ async function startRound() {
     if (!isHost()) {
       setStatus("ホストがスタートするよ。");
       return;
-    }
-  } else {
-    game.mode = "cpu";
-    if (!game.cpu.lockedBet) {
-      game.cpu.bet = Math.min(game.cpu.bank, Math.max(10, game.p1.bet));
-      game.cpu.lockedBet = true;
-      game.cpu.allIn = game.cpu.bet === game.cpu.bank;
     }
   }
 
